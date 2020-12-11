@@ -9,10 +9,18 @@
       <string>/usr/bin/pmset</string>
       <string>-a</string>
       <string>displaysleep</string>
-      <string>180</string>
+      <string>0</string>
       <string>disksleep</string>
-      <string>180</string>
+      <string>0</string>
+      <string>powernap</string>
+      <string>0</string>
       <string>autopoweroff</string>
+      <string>0</string>
+      <string>sleep</string>
+      <string>0</string>
+      <string>networkoversleep</string>
+      <string>0</string>
+      <string>womp</string>
       <string>0</string>
     </array>
     <key>RunAtLoad</key>
@@ -21,5 +29,9 @@
     <true/>
     <key>UserName</key>
     <string>root</string>
+    <key>StandardOutPath</key>
+    <string>/private/var/log/launchctl/pmset.log</string>
+    <key>StandardErrorPath</key>
+    <string>/private/var/log/launchctl/pmset.log</string>
   </dict>
 </plist>
