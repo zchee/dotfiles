@@ -1,0 +1,308 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+# ----------------------------------------------------------------------------
+# Initialize the git repository
+
+info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n" "$1"; }
+warn() { printf "\\x1b[1;33m[WARN]\\x1b[0m %s\\n" "$1"; }
+fatal() { printf "\x1b[1;34m[FATAL]\x1b[0m %s\\n" "$1"; exit 1; }
+
+usage() {
+  printf "Usage: %s [license] [language...]" "$(basename "$0")"
+  exit 1
+}
+
+GIIGNORE_REPOSITORY="$HOME/src/github.com/github/gitignore"
+
+# fetch latest gitignore
+if [[ ! -d $GIIGNORE_REPOSITORY ]]; then
+  git clone https://github.com/github/gitignore.git "${GIIGNORE_REPOSITORY}"
+fi
+
+if [[ "$#" -lt 2 ]]; then
+  if [[ "$1" == '-l' ]]; then
+    find "$GIIGNORE_REPOSITORY" -maxdepth 2 -type f -name '*.gitignore' | sort | cut -d '/' -f 8-9 | sed "s|.gitignore||g"
+    exit 0
+  fi
+  usage
+fi
+
+ARG_LICENSE="$1"; shift
+ARG_LANGUAGES="$*"
+ORGANIZATION_NAME="$(basename "$(dirname "$PWD")")"
+PROJECT_NAME="${PROJECT_NAME:-$(basename "$PWD")}"
+
+
+case "$ARG_LICENSE" in
+  bsd|bsd-project)
+    LICENSE_TYPE=BSD3_PROJECT
+    ;;
+  bsd-owner)
+    LICENSE_TYPE=BSD3_OWNER
+    ;;
+  bsd-go)
+    LICENSE_TYPE=BSD3_THE_GO_AUTHORS
+    ;;
+  mit|mit-project)
+    LICENSE_TYPE=MIT_PROJECT
+    ;;
+  mit-owner)
+    LICENSE_TYPE=MIT_OWNER
+    ;;
+  apache)
+    LICENSE_TYPE=Apache
+    ;;
+  mercari|merpay)
+    LICENSE_TYPE=
+    ;;
+  *)
+    echo '[FATAL] unknown license type'
+    usage
+    ;;
+esac
+
+# git init
+if [[ -d '.git' ]]; then
+  warn '.git directory already exist'
+fi
+git init > /dev/null 2>&1
+
+# remove LICENSE file if exist
+if [[ -f 'LICENSE' ]]; then
+  rm -f LICENSE
+fi
+
+# write LICENSE
+if [[ -n "$LICENSE_TYPE" ]]; then
+  cat "$XDG_CONFIG_HOME/license/$LICENSE_TYPE" > LICENSE
+  if [[ "$LICENSE_TYPE" == "BSD3_PROJECT" ]] || [[ "$LICENSE_TYPE" == "MIT_PROJECT" ]]; then
+    sed -i "s|\$PROJECT_NAME|$PROJECT_NAME|g" LICENSE
+  fi
+  sed -i "s|\$YEAR|$(date '+%Y')|g" LICENSE
+fi
+
+pushd "$GIIGNORE_REPOSITORY" > /dev/null 2>&1
+git pull origin master > /dev/null 2>&1
+popd > /dev/null 2>&1
+
+# write .gitignore
+cat <<EOF > .gitignore
+# $PROJECT_NAME project generated files to ignore
+#  if you want to ignore files created by your editor/tools,
+#  please consider a global .gitignore https://help.github.com/articles/ignoring-files
+#  please do not open a pull request to add something created by your editor or tools
+EOF
+
+# write .gitattributes
+touch .gitattributes
+cat <<EOF >> .gitattributes
+# $PROJECT_NAME project gitattributes file
+#  https://github.com/github/linguist#using-gitattributes
+#  https://github.com/github/linguist/blob/master/lib/linguist/languages.yml
+
+# To prevent CRLF breakages on Windows for fragile files, like testdata.
+* -text
+
+docs        linguist-documentation
+EOF
+
+EXISTS=true
+for lang in ${ARG_LANGUAGES[*]}; do
+  LANGUAGE_IGNORE_FILE="${lang}.gitignore"
+  if [[ $lang == 'go-pkg' ]] || [[ $lang == 'go-simple' ]] ; then
+    LANGUAGE_IGNORE_FILE="Go.gitignore"
+  fi
+  if [[ ! -f "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE_FILE" ]]; then
+    if [[ -f "$GIIGNORE_REPOSITORY/Global/${lang}.gitignore" ]]; then
+      # Global
+      LANGUAGE_IGNORE_FILE="Global/${lang}.gitignore"
+    elif [[ -f "$GIIGNORE_REPOSITORY/community/${lang}.gitignore" ]]; then
+      # community
+      LANGUAGE_IGNORE_FILE="community/${lang}.gitignore"
+    else
+      warn "Not found ${lang}.gitignore"
+      EXISTS=false
+    fi
+  fi
+
+  if $EXISTS; then
+    printf "\\n# github/gitignore/%s" "$LANGUAGE_IGNORE_FILE" >> .gitignore
+    printf "\\n%s\\n" "$(cat "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE_FILE")" >> .gitignore
+  fi
+
+  case "$lang" in
+    go|go-pkg|go-simple|Go|Go-pkg)
+      sed -i 's|# vendor/|vendor/|' .gitignore
+
+      {
+      echo "
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+
+# Folders
+_obj
+_test
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+# cgo generated
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+# test generated
+_testmain.go
+
+# benchmark
+old.txt
+new.txt
+bench.txt
+
+# profile
+*.pprof
+
+# coverage
+coverage.*"
+      } >> .gitignore
+
+      # write .gitattributes
+      cat <<EOF >> .gitattributes
+*.pb.go     linguist-generated
+*_gen.go    linguist-generated
+*_string.go linguist-generated
+EOF
+
+      # golangci-lint
+      cp "$XDG_DATA_HOME/boilerplate/go/.golangci.yml" .
+      sed -i "s|# local-prefixes: github.com/|local-prefixes: github.com/$ORGANIZATION_NAME/$PROJECT_NAME|" .golangci.yml
+
+      # creates hack directory
+      mkdir -p hack/boilerplate
+      cp "$XDG_DATA_HOME/boilerplate/go/boilerplate.go.txt" hack/boilerplate
+      sed -i "s|PKG|$PROJECT_NAME|g" hack/boilerplate/boilerplate.*.txt
+      sed -i "s|YEAR|$(date +%Y)|g" hack/boilerplate/boilerplate.*.txt
+
+      if [[ "$lang" != "go-simple" ]]; then
+        mkdir -p hack/make
+        cp "$XDG_DATA_HOME/boilerplate/go/go.mk" hack/make/go.mk
+        cat <<EOF >> Makefile
+# ----------------------------------------------------------------------------
+# global
+
+.DEFAULT_GOAL = static
+APP = $PROJECT_NAME
+CMD_PREFIX = \$(PKG)/cmd/
+CMD = \$(CMD_PREFIX)\$(APP)
+
+# ----------------------------------------------------------------------------
+# target
+
+# ----------------------------------------------------------------------------
+# include
+
+include hack/make/go.mk
+
+# ----------------------------------------------------------------------------
+# overlays
+EOF
+      if [[ "$lang" == *"go-simple"* ]]; then
+        cp "$XDG_DATA_HOME/boilerplate/go/go-pkg.mk" hack/make/go.mk
+      fi
+
+      fi
+    ;;
+
+    orb)
+      NAMESPACE=$ORGANIZATION_NAME
+      if [[ $NAMESPACE == 'circleci-orb' ]]; then
+        NAMESPACE='cci-orb'
+      fi
+      sed -i "s|$PROJECT_NAME|$ORGANIZATION_NAME/$PROJECT_NAME|" LICENSE
+      sed -i "s|$PROJECT_NAME|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitignore
+      sed -i "s|$PROJECT_NAME|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitattributes
+      mkdir -p src hack/boilerplate hack/make
+      cp "$XDG_DATA_HOME"/boilerplate/yaml/orb/boilerplate.*.txt hack/boilerplate/
+      cp "$XDG_DATA_HOME/boilerplate/yaml/orb/.yamllint" .yamllint
+      cp "$XDG_DATA_HOME/boilerplate/yaml/orb/orb.mk" hack/make/
+      sed -i "s|PKG|$PROJECT_NAME|g" hack/boilerplate/boilerplate.*.txt
+      cat <<EOF >> src/orb.yml
+
+version: 2.1
+
+description: |
+
+EOF
+
+      cat <<EOF >> Makefile
+# ----------------------------------------------------------------------------
+# global
+
+.DEFAULT_GOAL = help
+
+NAMESPACE = $NAMESPACE
+ORB = $PROJECT_NAME
+
+# ----------------------------------------------------------------------------
+# target
+
+# ----------------------------------------------------------------------------
+# include
+
+include hack/make/orb.mk
+
+# ----------------------------------------------------------------------------
+# overlays
+EOF
+
+      {
+      echo "
+# packed orb
+/src/$PROJECT_NAME.yml"
+      } >> .gitignore
+    ;;
+
+    *)
+      mkdir -p hack/boilerplate
+      {
+        if find "$XDG_DATA_HOME/boilerplate/$lang" -maxdepth 1 -type f -name 'boilerplate.*.txt' > /dev/null 2>&1; then
+          cp "$XDG_DATA_HOME"/boilerplate/"$lang"/boilerplate.*.txt hack/boilerplate/
+          sed -i "s|PKG|$PROJECT_NAME|g" hack/boilerplate/boilerplate.*.txt
+        fi
+      }
+    ;;
+  esac
+done
+
+# creates README.md
+printf "%s\\n" "# $PROJECT_NAME" > README.md
+
+# set git remote origin
+git remote add origin "git@github.com:$ORGANIZATION_NAME/$PROJECT_NAME.git" > /dev/null 2>&1 || true
+
+# git add
+if [[ -f .gitignore ]]; then
+  git add .gitignore
+fi
+if [[ -f .gitattributes ]]; then
+  git add .gitattributes
+fi
+if [[ -f LICENSE ]]; then
+  git add LICENSE
+fi
+
+if [[ "x$lang" == "xgo-simple" ]]; then
+  git add hack/boilerplate
+fi
+
+
+# git commit
+git commit -m 'Initial commit' --gpg-sign > /dev/null 2>&1
+
+info "Generated $PROJECT_NAME repository"
