@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ ! $# -ge 1 ]] && { echo "[ERROR] Usage: $(basename "$0") [VERSION]"; exit 1; }
+
+error() { printf "\x1b[1;31m[ERROR]\x1b[0m %s\\n" "$1" >&2; exit 1; }
+
+type go >/dev/null 2>&1 || { error "go command not found"; }
+
+PACKAGE="$1"
+if [[ "$#" -eq 2 && "$2" == 'latest' ]]; then
+  go list -u -m -versions -mod=mod "$PACKAGE" | awk -F' ' '{print $NF}'
+else
+  go list -u -m -versions -mod=mod "$PACKAGE"
+fi
