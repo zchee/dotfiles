@@ -175,7 +175,7 @@ coverage.*"
       # write .gitattributes
       cat <<EOF >> .gitattributes
 *.pb.go     linguist-generated
-*_gen.go    linguist-generated
+*gen.go     linguist-generated
 *_string.go linguist-generated
 EOF
 
