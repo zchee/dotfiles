@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+PATTERN="$1"
+shift
+REPLACE="$1"
+shift
+
+if command -v rg > /dev/null 2>&1; then
+  rg -l --multiline --hidden --no-ignore-vcs "$@" "$PATTERN" | xargs gsed -E -i "s|$PATTERN|$REPLACE|g"
+elif command -v pt > /dev/null 2>&1; then
+  pt -l --hidden --skip-vcs-ignores "$1" | xargs sed -i "s|$1|$2|g"
+else
+  grep -rl "$1" "$PWD" | xargs sed -i "s|$1|$2|g"
+fi
