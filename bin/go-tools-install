@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CWD="$PWD"
+if [[ ! "$CWD" = *'golang.org/x/tools'* ]]; then
+  echo 'current directory is not golang.org/x/tools'
+  exit 1
+fi
+
+export CGO_ENABLE=0
+
+buildtags='osusergo,netgo,static'
+readonly buildtags
+
+PACKAGES="$(go list -f='{{ if eq .Name "main" }}{{ .ImportPath }}{{ end }}' ./... | grep -v -e 'cmd/getgo/server' -e 'internal/lsp/helper' -e 'internal/lsp/source/genapijson' | tr '\n' ' ')"
+readonly PACKAGES
+
+# shellcheck disable=SC2086
+go install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w "-extldflags=-static"' ${PACKAGES[*]}
+
+pushd ./gopls > /dev/null 2>&1
+go install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w "-extldflags=-static"' .
+
+pushd "${CWD}" > /dev/null 2>&1
