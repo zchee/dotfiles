@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PACKAGE_ROOT="$(dirname "$(go env GOMOD)")"
+readonly PACKAGE_ROOT
+
+GO=${GO:-$(command -v go)}
+
+export GOOS=${GOOS:-$(go env GOOS)}
+export GOARCH=${GOARCH:-$(go env GOARCH)}
+
+trap INT ABRT TERM
+
+filter='{{ if and (or .GoFiles .CgoFiles) (ne .Name "main") }}{{ .ImportPath }}{{ end }}'
+readonly filter
+
+PKGS="$(${GO} list -f="$filter" "${PACKAGE_ROOT}"/...)"
+if ! "${GO}" install -v -x -mod=vendor "$@" $(echo "${PKGS}" | tr '\n' ' '); then
+  echo 'skip'
+fi
+
+if [[ -d "${PACKAGE_ROOT}/vendor" ]]; then
+  VENDOR_PKGS="$(${GO} list -f="$filter" "${PACKAGE_ROOT}"/vendor/...)"
+  if ! "${GO}" install -v -x -mod=vendor "$@" $(echo "${VENDOR_PKGS}" | tr '\n' ' '); then
+    exit 1
+  fi
+fi
