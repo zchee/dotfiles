@@ -8,20 +8,22 @@
     <array>
       <string>/usr/bin/pmset</string>
       <string>-a</string>
+      <string>autopoweroff</string>
+      <string>0</string>
       <string>displaysleep</string>
       <string>0</string>
       <string>disksleep</string>
       <string>0</string>
-      <string>powernap</string>
+      <string>networkoversleep</string>
       <string>0</string>
-      <string>autopoweroff</string>
+      <string>hibernatemode</string>
+      <string>3</string>
+      <string>powernap</string>
       <string>0</string>
       <string>sleep</string>
       <string>0</string>
-      <string>networkoversleep</string>
-      <string>0</string>
       <string>womp</string>
-      <string>0</string>
+      <string>1</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
