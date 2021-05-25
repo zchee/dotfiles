@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+BIN="${0##*-}"
+
+info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
+
+export CLOUDSDK_PYTHON='/usr/bin/python'
+
+[[ ! $# -eq 1 ]] && { echo "[ERROR] Usage: $BIN [VERSION]"; exit 1; }
+VERSION=$1
+
+OS=$(uname | tr '[:upper:]' '[:lower:]')
+
+if [[ -f '/usr/local/google-cloud-sdk/properties' ]]; then
+  info "Backup google-cloud-sdk/properties..."
+  mv /usr/local/google-cloud-sdk/properties /tmp
+
+  info "Delete old google-cloud-sdk..."
+  rm -rf /usr/local/google-cloud-sdk
+fi
+
+
+info "Install google-cloud-sdk $VERSION for $OS..."
+curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-"$VERSION"-"$OS"-x86_64.tar.gz | tar -C /usr/local -xzf -
+
+info "Install gcloud components..."
+/usr/local/google-cloud-sdk/install.sh --usage-reporting=false --command-completion=false --path-update=false --quiet --additional-components \
+alpha beta anthos-auth app-engine-go app-engine-java app-engine-python app-engine-python-extras appctl cloud-build-local cloud-datastore-emulator cloud-firestore-emulator cloud_sql_proxy docker-credential-gcr emulator-reverse-proxy minikube pubsub-emulator skaffold pkg kubectl-oidc config-connector local-extract
+
+if [[ -f '/tmp/properties' ]]; then
+  info "Restore google-cloud-sdk/properties"
+  mv /tmp/properties /usr/local/google-cloud-sdk
+fi
+
+info "Successful Install Google Cloud SDK"
+exit 0
