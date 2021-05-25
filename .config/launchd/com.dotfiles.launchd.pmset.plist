@@ -3,7 +3,7 @@
 <plist version="1.0">
   <dict>
     <key>Label</key>
-    <string>com.dotfiles.launchctl.pmset</string>
+    <string>com.dotfiles.launchd</string>
     <key>ProgramArguments</key>
     <array>
       <string>/usr/bin/pmset</string>
@@ -32,8 +32,8 @@
     <key>UserName</key>
     <string>root</string>
     <key>StandardOutPath</key>
-    <string>/private/var/log/launchctl/pmset.log</string>
+    <string>/private/var/log/launchd/pmset.log</string>
     <key>StandardErrorPath</key>
-    <string>/private/var/log/launchctl/pmset.log</string>
+    <string>/private/var/log/launchd/pmset.log</string>
   </dict>
 </plist>

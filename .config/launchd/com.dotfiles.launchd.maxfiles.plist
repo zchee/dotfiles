@@ -3,7 +3,7 @@
 <plist version="1.0">
   <dict>
     <key>Label</key>
-    <string>com.dotfiles.launchctl.maxfiles</string>
+    <string>com.dotfiles.launchd.maxfiles</string>
     <key>ProgramArguments</key>
     <array>
       <string>/bin/launchctl</string>
