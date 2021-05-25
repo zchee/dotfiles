@@ -5,4 +5,5 @@
 # To prevent CRLF breakages on Windows for fragile files, like testdata.
 * -text
 
-docs linguist-documentation
+docs                                 linguist-documentation
+.config/zsh/prompt/prompt_pure_setup linguist-language=Shell
