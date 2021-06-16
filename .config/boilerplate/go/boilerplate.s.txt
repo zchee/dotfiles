@@ -1,0 +1,11 @@
+// SPDX-FileCopyrightText: YEAR The PKG Authors
+// SPDX-License-Identifier: BSD-3-Clause
+
+#include "go_asm.h"
+#include "go_tls.h"
+#include "funcdata.h"
+#include "textflag.h"
+
+// The presence of this file allows the package to use the
+// "go:linkname" hack to call non-exported functions in the
+// Go runtime.
