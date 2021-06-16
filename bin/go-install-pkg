@@ -15,13 +15,13 @@ filter='{{ if and (or .GoFiles .CgoFiles) (ne .Name "main") }}{{ .ImportPath }}{
 readonly filter
 
 PKGS="$(${GO} list -f="$filter" "${PACKAGE_ROOT}"/...)"
-if ! "${GO}" install -v -x -mod=vendor "$@" $(echo "${PKGS}" | tr '\n' ' '); then
+if ! "${GO}" install -v -x "$@" $(echo "${PKGS}" | tr '\n' ' '); then
   echo 'skip'
 fi
 
 if [[ -d "${PACKAGE_ROOT}/vendor" ]]; then
   VENDOR_PKGS="$(${GO} list -f="$filter" "${PACKAGE_ROOT}"/vendor/...)"
-  if ! "${GO}" install -v -x -mod=vendor "$@" $(echo "${VENDOR_PKGS}" | tr '\n' ' '); then
+  if ! "${GO}" install -v -x "$@" $(echo "${VENDOR_PKGS}" | tr '\n' ' '); then
     exit 1
   fi
 fi
