@@ -2,23 +2,22 @@
 set -euo pipefail
 
 CWD="$PWD"
-if [[ ! "$CWD" = *'golang.org/x/tools'* ]]; then
+if [[ "$CWD" != *'golang.org/x/tools'* ]]; then
   echo 'current directory is not golang.org/x/tools'
   exit 1
 fi
 
-export CGO_ENABLE=0
+export CGO_ENABLED=0
 
 buildtags='osusergo,netgo,static'
 readonly buildtags
 
-PACKAGES="$(go list -f='{{ if eq .Name "main" }}{{ .ImportPath }}{{ end }}' ./... | grep -v -e 'cmd/getgo/server' -e 'internal/lsp/helper' -e 'internal/lsp/source/genapijson' | tr '\n' ' ')"
+PACKAGES="$(go list -f='{{ if eq .Name "main" }}{{ .ImportPath }}{{ end }}' ./... | grep -v -e 'cmd/getgo/server' -e 'internal/lsp/helper' -e 'internal/stack/gostacks' | tr '\n' ' ')"
 readonly PACKAGES
 
-# shellcheck disable=SC2086
-go install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w "-extldflags=-static"' ${PACKAGES[*]}
+go install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode=internal "-extldflags=-static -static-pie -fno-PIC"' ${PACKAGES}
 
-pushd ./gopls > /dev/null 2>&1
-go install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w "-extldflags=-static"' .
+pushd "$(go env GOPATH)/src/golang.org/x/tools/gopls" > /dev/null 2>&1
+go install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode=internal "-extldflags=-static -static-pie -fno-PIC"' .
 
 pushd "${CWD}" > /dev/null 2>&1
