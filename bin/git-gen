@@ -34,9 +34,11 @@ fi
 
 ARG_LICENSE="$1"
 shift
-ARG_LANGUAGES="$*"
-ORGANIZATION_NAME="$(basename "$(dirname "$PWD")")"
+ARG_LANGUAGES=("$@")
+
+ORGANIZATION_NAME="${ORGANIZATION_NAME:-$(basename "$(dirname "$PWD")")}"
 PROJECT_NAME="${PROJECT_NAME:-$(basename "$PWD")}"
+AUTHOR="${AUTHOR:-$PROJECT_NAME}"
 
 declare LICENSE_TYPE
 case "$ARG_LICENSE" in
@@ -76,11 +78,11 @@ git init > /dev/null 2>&1
 # write LICENSE if not exist
 if [[ ! -f 'LICENSE' ]]; then
   if [[ -n "$LICENSE_TYPE" ]]; then
-    cat "$XDG_CONFIG_HOME/license/$LICENSE_TYPE" > LICENSE
+    cat "$XDG_CONFIG_HOME/boilerplate/license/$LICENSE_TYPE" > LICENSE
     if [[ "$LICENSE_TYPE" == "BSD3_PROJECT" ]] || [[ "$LICENSE_TYPE" == "MIT_PROJECT" ]]; then
-      sed -i "s|\$PROJECT_NAME|$PROJECT_NAME|g" LICENSE
+      sed -i "s|AUTHOR|$AUTHOR|g" LICENSE
     fi
-    sed -i "s|\$YEAR|$(date '+%Y')|g" LICENSE
+    sed -i "s|YEAR|$(date '+%Y')|g" LICENSE
   fi
 fi
 
@@ -90,7 +92,7 @@ popd > /dev/null 2>&1
 
 # write .gitignore
 cat << EOF > .gitignore
-# $PROJECT_NAME project generated files to ignore
+# AUTHOR project generated files to ignore
 #  if you want to ignore files created by your editor/tools,
 #  please consider a global .gitignore https://help.github.com/articles/ignoring-files
 #  please do not open a pull request to add something created by your editor or tools
@@ -99,7 +101,7 @@ EOF
 # write .gitattributes
 touch .gitattributes
 cat << EOF >> .gitattributes
-# $PROJECT_NAME project gitattributes file
+# AUTHOR project gitattributes file
 #  https://github.com/github/linguist/blob/master/docs/overrides.md
 
 # To prevent CRLF breakages on Windows for fragile files, like testdata.
@@ -128,12 +130,12 @@ for lang in "${ARG_LANGUAGES[@]}"; do
   fi
 
   if $EXISTS; then
-    printf "\\n# github/gitignore/%s" "$LANGUAGE_IGNORE_FILE" >> .gitignore
+    printf "\\n# github/gitignore/%s" "${LANGUAGE_IGNORE_FILE^}" >> .gitignore
     printf "\\n%s\\n" "$(cat "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE_FILE")" >> .gitignore
   fi
 
   case "$lang" in
-    go | go-old)
+    go | Go | go-old)
       sed -i 's|# vendor/|vendor/|' .gitignore
 
       {
@@ -179,55 +181,41 @@ coverage.*"
 *_string.go linguist-generated
 EOF
 
+      # .github
+      cp -r "$XDG_CONFIG_HOME/boilerplate/.github" .github
+      sed -i "s|PKG|$PROJECT_NAME|g" .github/ISSUE_TEMPLATE/bug_report.yml
+
+      sed -i "s|AUTHOR|$(basename "$(dirname "$PWD")")/$(basename "$PWD")|" .gitignore .gitattributes
+
       # golangci-lint
       cp "$XDG_CONFIG_HOME/boilerplate/go/.golangci.yml" .
-      sed -i "s|# local-prefixes: github.com/|local-prefixes: github.com/$ORGANIZATION_NAME/$PROJECT_NAME|" .golangci.yml
-      sed -i "s|\$AUTHOR|$PROJECT_NAME|" .golangci.yml
+      sed -i "s|local-prefixes: github.com/|local-prefixes: github.com/$ORGANIZATION_NAME/$PROJECT_NAME|" .golangci.yml
+      sed -i "s|AUTHOR: AUTHOR|AUTHOR: $AUTHOR|" .golangci.yml
 
       # creates hack directory
       mkdir -p hack/boilerplate
       cp "$XDG_CONFIG_HOME/boilerplate/go/boilerplate.go.txt" hack/boilerplate
-      sed -i "s|PKG|$PROJECT_NAME|g" hack/boilerplate/boilerplate.*.txt
+      sed -i "s|AUTHOR|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
       sed -i "s|YEAR|$(date +%Y)|g" hack/boilerplate/boilerplate.*.txt
 
       # create root go.mod
       go mod init && go mod edit -go=1.17
+      touch go.sum
 
       # create tools directory
       mkdir -p tools
       pushd tools > /dev/null 2>&1
       go mod init && go mod edit -go=1.17
       cat "$XDG_CONFIG_HOME/boilerplate/go/boilerplate.go.tools.txt" > tools.go
-      sed -i "s|PKG|$PROJECT_NAME|g" tools.go
+      sed -i "s|AUTHOR|$AUTHOR|g" tools.go
       sed -i "s|YEAR|$(date +%Y)|g" tools.go
-      go mod edit -require=golang.org/x/tools@master
+      go mod edit -require=golang.org/x/tools@master -require=mvdan.cc/gofumpt@master -replace=mvdan.cc/gofumpt=github.com/mvdan/gofumpt@master
       go mod tidy -v
       popd > /dev/null 2>&1
 
       # write Makefile
       if [[ "$lang" != "go" ]]; then
-        mkdir -p hack/make
-        cp "$XDG_CONFIG_HOME/boilerplate/go/go.mk" hack/make/go.mk
-        cat << EOF >> Makefile
-# ----------------------------------------------------------------------------
-# global
-
-.DEFAULT_GOAL = static
-APP = $PROJECT_NAME
-CMD_PREFIX = \$(PKG)/cmd/
-CMD = \$(CMD_PREFIX)\$(APP)
-
-# ----------------------------------------------------------------------------
-# target
-
-# ----------------------------------------------------------------------------
-# include
-
-include hack/make/go.mk
-
-# ----------------------------------------------------------------------------
-# overlays
-EOF
+        cp "$XDG_CONFIG_HOME/boilerplate/go/Makefile" Makefile
       fi
       ;;
 
@@ -236,14 +224,14 @@ EOF
       if [[ $NAMESPACE == 'circleci-orb' ]]; then
         NAMESPACE='cci-orb'
       fi
-      sed -i "s|$PROJECT_NAME|$ORGANIZATION_NAME/$PROJECT_NAME|" LICENSE
-      sed -i "s|$PROJECT_NAME|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitignore
-      sed -i "s|$PROJECT_NAME|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitattributes
+      sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" LICENSE
+      sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitignore
+      sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitattributes
       mkdir -p src hack/boilerplate hack/make
       cp "$XDG_CONFIG_HOME"/boilerplate/yaml/orb/boilerplate.*.txt hack/boilerplate/
       cp "$XDG_CONFIG_HOME/boilerplate/yaml/orb/.yamllint" .yamllint
       cp "$XDG_CONFIG_HOME/boilerplate/yaml/orb/orb.mk" hack/make/
-      sed -i "s|PKG|$PROJECT_NAME|g" hack/boilerplate/boilerplate.*.txt
+      sed -i "s|PKG|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
       cat << EOF >> src/orb.yml
 
 version: 2.1
@@ -285,7 +273,7 @@ EOF
       {
         if find "$XDG_CONFIG_HOME/boilerplate/$lang" -maxdepth 1 -type f -name 'boilerplate.*.txt' > /dev/null 2>&1; then
           cp "$XDG_CONFIG_HOME/boilerplate/$lang"/boilerplate.*.txt hack/boilerplate/
-          sed -i "s|PKG|$PROJECT_NAME|g" hack/boilerplate/boilerplate.*.txt
+          sed -i "s|PKG|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
         fi
       }
       ;;
@@ -293,7 +281,9 @@ EOF
 done
 
 # creates README.md
-printf "#%s\\n" "$PROJECT_NAME" > README.md
+if [ ! -f 'README.md' ]; then
+  printf "# %s\\n" "$PROJECT_NAME" > README.md
+fi
 
 # set git remote origin
 git remote add origin "git@github.com:$ORGANIZATION_NAME/$PROJECT_NAME.git" > /dev/null 2>&1 || true
@@ -305,10 +295,5 @@ git remote add origin "git@github.com:$ORGANIZATION_NAME/$PROJECT_NAME.git" > /d
 
 # git commit
 git commit -m 'Initial commit' --signoff --gpg-sign > /dev/null 2>&1
-
-# if [[ -f go.mod ]]; then
-#   git add go.mod
-#   git commit -m 'module: init Go module' --signoff --gpg-sign > /dev/null 2>&1
-# fi
 
 info "Generated $PROJECT_NAME repository"
