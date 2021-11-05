@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: YEAR The PKG Authors
+// Copyright YEAR The AUTHOR Authors
 // SPDX-License-Identifier: BSD-3-Clause
 
 //go:build tools
