@@ -1,0 +1,15 @@
+If:
+  PathMatch: [ '/Users/zchee/src/github.com/llvm/llvm-project/.*' ]
+  PathExclude: [ include/llvm-c/.* ]
+Index:
+  Background: Skip
+  ProjectRoot: /Users/zchee/src/github.com/llvm/llvm-project
+  External:
+    Server: clangd-index.llvm.org:5900
+    MountPoint: /Users/zchee/src/github.com/llvm/llvm-project/.*
+---
+If:
+  PathMatch: [ '.*/github.com/go-clang/clang-v.*/clang/clang-c/.*\.h' ]
+CompileFlags:
+  Add: [ -I.. ]
+CompilationDatabase: None
