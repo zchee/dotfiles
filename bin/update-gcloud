@@ -1,24 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
-IFS=$'\n\t'
 
 BIN="${0##*-}"
 
 info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
-
-export CLOUDSDK_PYTHON='/usr/bin/python'
+error() { printf "\\x1b[1;31m[ERROR]\\x1b[0m %s\\n\\n" "$1"; }
 
 [[ ! $# -eq 1 ]] && { echo "[ERROR] Usage: $BIN [VERSION]"; exit 1; }
 VERSION=$1
 
 OS=$(uname | tr '[:upper:]' '[:lower:]')
 
-if [[ -f '/usr/local/google-cloud-sdk/properties' ]]; then
-  info "Backup google-cloud-sdk/properties..."
-  mv /usr/local/google-cloud-sdk/properties /tmp
+_restore_sdk() {
+  cp -r /tmp/google-cloud-sdk "$CLOUDSDK_ROOT_DIR"
+  rm -rf /tmp/google-cloud-sdk
+}
 
-  info "Delete old google-cloud-sdk..."
-  rm -rf /usr/local/google-cloud-sdk
+# Take care of signals
+_trap_exit() { # Handle trapped signals
+  case $1 in
+    INT)
+      error "interrupted by user"
+      _restore_sdk
+      exit 100
+      ;;
+    TERM)
+      error "terminated"
+      _restore_sdk
+      exit 101
+      ;;
+    *)
+      error "Terminating on unknown signal"
+      _restore_sdk
+      exit 102
+      ;;
+  esac
+}
+
+# Trap signals
+trap "_trap_exit INT" INT
+trap "_trap_exit TERM" TERM HUP
+
+if [[ -f "$CLOUDSDK_ROOT_DIR/properties" ]]; then
+  info "Backup google-cloud-sdk/properties..."
+  mv "$CLOUDSDK_ROOT_DIR/properties" /tmp
+
+  info "Backup old google-cloud-sdk..."
+  mv "$CLOUDSDK_ROOT_DIR" /tmp
 fi
 
 
@@ -26,13 +54,48 @@ info "Install google-cloud-sdk $VERSION for $OS..."
 curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-"$VERSION"-"$OS"-x86_64.tar.gz | tar -C /usr/local -xzf -
 
 info "Install gcloud components..."
-/usr/local/google-cloud-sdk/install.sh --usage-reporting=false --command-completion=false --path-update=false --quiet --additional-components \
-alpha beta anthos-auth app-engine-go app-engine-java app-engine-python app-engine-python-extras appctl cloud-build-local cloud-datastore-emulator cloud-firestore-emulator cloud_sql_proxy docker-credential-gcr emulator-reverse-proxy minikube pubsub-emulator skaffold pkg kubectl-oidc config-connector local-extract
+/usr/local/google-cloud-sdk/install.sh --usage-reporting=false --command-completion=false --path-update=false --install-python=true --quiet --additional-components \
+  core \
+  gsutil \
+  alpha \
+  beta \
+  app-engine-python \
+  app-engine-python-extras \
+  kubectl \
+  app-engine-go \
+  bq \
+  pubsub-emulator \
+  emulator-reverse-proxy \
+  cloud-build-local \
+  docker-credential-gcr \
+  kustomize \
+  minikube \
+  nomos \
+  local-extract \
+  skaffold \
+  config-connector \
+  app-engine-java \
+  kpt \
+  kubectl-oidc \
+  pkg \
+  gcloud-man-pages \
+  terraform-validator
+  # anthos-auth  \
+  # app-engine-php \
+  # appctl \
+  # bigtable \
+  # cbt  \
+  # cloud-datastore-emulator  \
+  # cloud-firestore-emulator \
+  # cloud_sql_proxy \
+  # datalab \
 
 if [[ -f '/tmp/properties' ]]; then
   info "Restore google-cloud-sdk/properties"
-  mv /tmp/properties /usr/local/google-cloud-sdk
+  cp /tmp/properties "$CLOUDSDK_ROOT_DIR"
 fi
+
+rm -rf /tmp/google-cloud-sdk
 
 info "Successful Install Google Cloud SDK"
 exit 0
