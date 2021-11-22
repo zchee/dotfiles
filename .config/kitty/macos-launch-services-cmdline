@@ -1,0 +1,1 @@
+--single-instance --instance-group=main --listen-on=unix:/tmp/kitty.sock --start-as=fullscreen
