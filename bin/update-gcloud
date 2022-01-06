@@ -55,30 +55,30 @@ curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-clou
 
 info "Install gcloud components..."
 /usr/local/google-cloud-sdk/install.sh --usage-reporting=false --command-completion=false --path-update=false --install-python=true --quiet --additional-components \
-  core \
-  gsutil \
   alpha \
-  beta \
+  app-engine-go \
+  app-engine-java \
   app-engine-python \
   app-engine-python-extras \
-  kubectl \
-  app-engine-go \
+  beta \
   bq \
-  pubsub-emulator \
-  emulator-reverse-proxy \
   cloud-build-local \
+  cloud_sql_proxy
+  config-connector \
+  core \
   docker-credential-gcr \
+  gcloud-man-pages \
+  gsutil \
+  kpt \
+  kubectl \
+  kubectl-oidc \
   kustomize \
+  local-extract \
   minikube \
   nomos \
-  local-extract \
-  skaffold \
-  config-connector \
-  app-engine-java \
-  kpt \
-  kubectl-oidc \
   pkg \
-  gcloud-man-pages \
+  pubsub-emulator \
+  skaffold \
   terraform-validator
   # anthos-auth  \
   # app-engine-php \
@@ -87,8 +87,8 @@ info "Install gcloud components..."
   # cbt  \
   # cloud-datastore-emulator  \
   # cloud-firestore-emulator \
-  # cloud_sql_proxy \
   # datalab \
+  # emulator-reverse-proxy \
 
 if [[ -f '/tmp/properties' ]]; then
   info "Restore google-cloud-sdk/properties"
