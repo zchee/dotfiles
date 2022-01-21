@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+declare -a ideargs=()
+declare -- wait=""
+
+for o in "$@"; do
+  if [[ "$o" = "--wait" || "$o" = "-w" ]]; then
+    wait="-W"
+    o="--wait"
+  fi
+  if [[ "$o" =~ " " ]]; then
+    ideargs+=("\"$o\"")
+  else
+    ideargs+=("$o")
+  fi
+done
+
+find_cmd="$(which find)"
+if $find_cmd --version | grep GNU > /dev/null; then
+  find_cmd+=' -O3'
+fi
+
+path=""
+if [[ $# -ge 1 ]]; then
+  path="$1"
+  if [[ "$path" == *'.'* ]]; then
+    path="$PWD"
+  fi
+fi
+
+open -na "$($find_cmd $HOME/Library/Application\ Support/JetBrains/Toolbox/apps/Goland -type f -executable -name $(basename "$0"))" "$wait" --args "${ideargs[*]}" "$path"
