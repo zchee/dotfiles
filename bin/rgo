@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+PATTERN="$1"
+shift
+
+exec "$(which rg)" \
+  "$PATTERN" \
+  --no-config \
+  --type go \
+  --type asm \
+  --mmap \
+  --threads=16 \
+  --block-buffered \
+  --pretty --colors=match:fg:yellow --colors=match:bg:black --colors=path:fg:magenta \
+  --no-ignore-vcs \
+  --glob='!{_*,zz_generated.*.go,bindata.go}' \
+  --glob='!{vendor,staging,third_party}' \
+  "$@" \
+  | sed "s|${HOME}|~|g" \
