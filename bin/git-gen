@@ -87,7 +87,7 @@ if [[ ! -f 'LICENSE' ]]; then
 fi
 
 pushd "$GIIGNORE_REPOSITORY" > /dev/null 2>&1
-git pull origin master > /dev/null 2>&1
+git pull origin main > /dev/null 2>&1
 popd > /dev/null 2>&1
 
 # write .gitignore
@@ -136,6 +136,7 @@ for lang in "${ARG_LANGUAGES[@]}"; do
 
   case "$lang" in
     go | Go | go-old)
+      sed -i 's|Dependency directories (remove the comment below to include it)|Dependency directories|' .gitignore
       sed -i 's|# vendor/|vendor/|' .gitignore
 
       {
