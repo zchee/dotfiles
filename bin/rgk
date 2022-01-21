@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+error() { printf "\x1b[1;31m[ERROR]\x1b[0m %s\\n" "$1" >&2; exit 1; }
+
+command -v rg >/dev/null 2>&1 || { error "command not found: rg"; }
+
+GOPATH="$(go env GOPATH)"
+
+PATTERN="$1"
+shift
+
+exec "$(which rg)" \
+  "$PATTERN" \
+  --block-buffered \
+  --mmap \
+  --no-config \
+  --no-ignore-vcs \
+  --pretty --colors=match:fg:yellow --colors=match:bg:black --colors=path:fg:magenta \
+  --threads=16 \
+  --type go \
+  --glob='!{_*,zz_generated.*.go,bindata.go}' \
+  --glob='!{vendor,staging,third_party}' \
+  "$@" \
+    "${GOPATH}/src/github.com/cri-o" \
+    "${GOPATH}/src/github.com/kubernetes-csi" \
+    "${GOPATH}/src/github.com/kubernetes-incubator" \
+    "${GOPATH}/src/github.com/kubernetes-sigs" \
+    "${GOPATH}/src/k8s.io" \
+    "${GOPATH}/src/knative.dev" \
+    "${GOPATH}/src/sigs.k8s.io" \
+  | sed 's|/Users/zchee|~|g'
