@@ -63,7 +63,7 @@ info "Install gcloud components..."
   beta \
   bq \
   cloud-build-local \
-  cloud_sql_proxy
+  cloud_sql_proxy \
   config-connector \
   core \
   docker-credential-gcr \
