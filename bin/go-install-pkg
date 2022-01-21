@@ -1,27 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PACKAGE_ROOT="$(dirname "$(go env GOMOD)")"
-readonly PACKAGE_ROOT
+ROOT="$PWD"
 
 GO=${GO:-$(command -v go)}
 
 export GOOS=${GOOS:-$(go env GOOS)}
 export GOARCH=${GOARCH:-$(go env GOARCH)}
-
-trap INT ABRT TERM
+export GOFLAGS=${GOFLAGS:-}
+export CGO_CFLAGS=${CGO_CFLAGS:-}
+export CGO_LDFLAGS=${CGO_LDFLAGS:-}
+GOBIN=$(mktemp -d); export GOBIN
+export GOEXPERIMENT=${GOEXPERIMENT:-}
 
 filter='{{ if and (or .GoFiles .CgoFiles) (ne .Name "main") }}{{ .ImportPath }}{{ end }}'
 readonly filter
 
-PKGS="$(${GO} list -f="$filter" "${PACKAGE_ROOT}"/...)"
-if ! "${GO}" install -v -x "$@" $(echo "${PKGS}" | tr '\n' ' '); then
-  echo 'skip'
-fi
+trap INT ABRT TERM
 
-if [[ -d "${PACKAGE_ROOT}/vendor" ]]; then
-  VENDOR_PKGS="$(${GO} list -f="$filter" "${PACKAGE_ROOT}"/vendor/...)"
-  if ! "${GO}" install -v -x "$@" $(echo "${VENDOR_PKGS}" | tr '\n' ' '); then
-    exit 1
+for gomod in $(find . -type f -name 'go.mod' -not -iwholename '*vendor*' -not -iwholename '*testdata*' -not -iwholename '*example*' -not -iwholename './tools/go.mod' -not -iwholename '*/_*');
+do
+  MODROOT="$(realpath $(dirname "$gomod"))"
+
+  pushd "${MODROOT}" > /dev/null 2>&1
+  
+  if [[ "$MODROOT" != '/usr/local/go'* ]]; then
+    ${GO} mod vendor -v
   fi
-fi
+  
+  PKGS="$(${GO} list -f="$filter" ./... | tr '\n' ' ')"
+  eval "${GO} install -v -x -mod=vendor $PKGS"
+  # echo "PKGS: $PKGS"  # debug
+  
+  if [[ -d "$(dirname "$gomod")/vendor" ]]; then
+    VENDOR_PKGS="$(${GO} list -f="$filter" "$MODROOT"/vendor/... | tr '\n' ' ')"
+    eval "${GO} install -v -x -mod=vendor $VENDOR_PKGS" || true
+    # echo "VENDOR_PKGS: $VENDOR_PKGS"  # debug
+  fi
+
+  pushd "${ROOT}" > /dev/null 2>&1
+done
