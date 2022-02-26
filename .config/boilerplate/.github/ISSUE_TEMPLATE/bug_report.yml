@@ -37,7 +37,7 @@ body:
         $ uname -a
         $ go version
         $ go env
-      render: shell
+      render: shell-script
     validations:
       required: true
 
