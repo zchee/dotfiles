@@ -1,0 +1,350 @@
+# ------------------------------------------------------------------------------
+# git-config
+#  https://git-scm.com/docs/git-config#_variables
+# ------------------------------------------------------------------------------
+
+[core]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-corefileMode
+	editor = nvim
+
+	# Treat spaces before tabs and all kinds of trailing whitespace as an error
+	# [default] trailing-space: looks for spaces at the end of a line
+	# [default] space-before-tab: looks for spaces before tabs at the beginning of a line
+	whitespace = space-before-tab,-indent-with-non-tab,cr-at-eol
+
+	# Make `git rebase` safer on OS X
+	# More info: <http://www.git-tower.com/blog/make-git-rebase-safe-on-osx/>
+	#  See also: <http://apple.stackexchange.com/a/52390/143973>
+	trustctime = false
+	# Ensure that unicode filenames aren't mangled by HFS:
+	# https://chromium.googlesource.com/chromium/src/+/master/docs/mac_build_instructions.md#Get-the-code
+	precomposeUnicode = true  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-coreprecomposeUnicode
+	quotepath = false
+	symlinks = true
+	autocrlf = false
+	safecrlf = true
+
+	# untrackedCache = true  # enabled by feature.experimental
+
+[user]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-useremail
+	email = zchee.io@gmail.com
+	name = Koichi Shiraishi
+	signingkey = 0xA71DFD3B4DA7A79B
+
+[author]
+	email = zchee.io@gmail.com
+	name = Koichi Shiraishi
+
+[committer]
+	email = zchee.io@gmail.com
+	name = Koichi Shiraishi
+
+[index]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-indexrecordEndOfIndexEntries
+	threads = true
+	# version = 4  # enabled by feature.experimental
+
+[protocol]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-protocolallow
+	allow = always
+	version = 2
+
+# Alias: based by https://github.com/jessfraz/dotfiles/blob/master/.gitconfig
+[alias]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-alias
+	a                = add
+	amend            = commit --amend --reuse-message=HEAD --gpg-sign  # Amend the currently staged files to the latest commit
+	ap               = add --patch
+	appraise         = !/Users/zchee/go/bin/git-appraise
+	b                = branch
+	ba               = branch -a
+	branches         = branch -a
+	c                = commit --gpg-sign --signoff
+	ca               = "!fn() { git add -A && git commit -av --signoff --gpg-sign; }; fn"  # Commit all changes
+	ce               = "!fn() { git commit --message $1 --signoff --gpg-sign; }; fn"
+	cl               = clone --recursive  # Clone a repository including all submodules
+	co               = checkout
+	contributors     = shortlog --summary --numbered  # List contributors with number of commits
+	credit           = "!fn() { git commit --amend --author \"$1 <$2>\" -C HEAD; }; fn"  # Credit an author on the latest commit
+	current          = "!fn() { git rev-parse --abbrev-ref HEAD; }; fn"  # Get current branch name
+	d                = diff
+	di               = "!fn() { git diff --patch-with-stat HEAD~$1 | ydiff -s -w0 --wrap; }; git diff-index --quiet HEAD -- || clear; fn"  # `git di $number` shows the diff between the state `$number` revisions ago and the current state
+	dm               = "!git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d"  # Remove branches that have already been merged with master, a.k.a. ‘delete merged’
+	ds               = "!fn() { git diff --patch-with-stat $1 | ydiff -s -w0 --wrap; }; fn"
+	f                = fetch --prune --verbose
+	fa               = "!fn() { git fetch --all --prune --jobs=16 --auto-gc --verbose; git fetch --tags --force --jobs=16 --auto-gc --verbose; }; fn"
+	fb               = "!fn() { git branch -a --contains $1; }; fn"  # Find branches containing commit
+	fc               = "!fn() { git log --pretty=format:'%C(yellow)%h	%Cblue%ad  %Creset%s%Cgreen  [%cn] %Cred%d' --decorate --date=short $1; }; fn"  # Find commits by source code
+	fm               = "!fn() { git log --pretty=format:'%C(yellow)%h	%Cblue%ad  %Creset%s%Cgreen  [%cn] %Cred%d' --decorate --date=short --grep=$1; }; fn"  # Find commits by commit message
+	fp               = "!fn() { export USER_BRANCH=(${(s/:/)$2}); git fetch origin pull/$1/head:$USER_BRANCH[2] && git branch --move $USER_BRANCH[2] pull/$1/$USER_BRANCH[1] $USER_BRANCH[2]; unset USER_BRANCH; }; fn"
+	ft               = "!fn() { git describe --always --contains $1; }; fn"  # Find tags containing commit
+	fullgc           = "!fn() { git reflog expire --expire=now --all && git gc --prune=now --aggressive; }; fn"  # full garbage colletion
+	go               = "!fn() { git checkout -b \"$1\" 2> /dev/null || git checkout \"$1\"; }; fn"  # Switch to a branch, creating it if necessary
+	graph            = log --graph --color --pretty=format:"%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n"  # Color graph log view
+	hash             = "!fn() { printf $(git rev-parse --verify HEAD | cut -c -12); }; fn"
+	hash10           = "!fn() { git rev-parse --verify HEAD | cut -c -10; }; fn"
+	hash7            = "!fn() { git rev-parse --verify HEAD | cut -c -7; }; fn"
+	hashfull         = "!fn() { git rev-parse --verify HEAD; }; fn"
+	l                = log --graph --color --pretty=format:'%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n' --patch  # Display file patch level
+	lf               = log --topo-order --stat --full-diff --graph --color --decorate=full
+	la               = log --graph --color --pretty=format:'%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n' --all  # Display all refs in refs/
+	lb               = log --topo-order --pretty=format:'%C(green)%h%C(reset) %s%n%C(blue)(%ar by %an)%C(red)%d%C(reset)%n'          # Brief format(need?)
+	lc               = shortlog --summary --numbered                                                                                 # git commit summary
+	lg               = log --color --decorate --graph --pretty=format:'%C(green)%h%C(reset) %s%C(red)%d%C(reset)%n' --abbrev-commit  # refs movement graph
+	lo               = log --topo-order --pretty=format:'%C(green)%h%C(reset) %s%C(red)%d%C(reset)%n'                                # Oneline
+	ls-gone          = "!fn() { git fetch --prune > /dev/null 2>&1 && git branch -vv | grep ': gone]' | awk '{print $1}' || true; }; fn"  # https://stackoverflow.com/a/48820687/5228839
+	ls-merged-remote = "!fn() { git fetch --prune > /dev/null 2>&1 && git branch master --merged | grep -v master || true; }; fn"  # https://stackoverflow.com/a/48820687/5228839
+	lsign            = log --graph --color --pretty=format:'%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n' --show-signature  # Show sign signature
+	mdiff            = "!fn() { git stash | head -1 | grep -q 'No local changes to save'; x=$?; git merge --no-commit $1 &>/dev/null; git add -u &>/dev/null; git diff --staged; git reset --hard &>/dev/null; test $x -ne 0 && git stash pop &>/dev/null; }; fn"
+	merged           = "!fn() { git branch --merged | egrep -v '(^*|master|main)'; git for-each-ref refs/heads/ '--format=%(refname:short)' | while read branch; do { ancestor=$(git merge-base $(git symbolic-ref --short HEAD) $branch); if [[ $(git cherry $(git symbolic-ref --short HEAD) $(git commit-tree $(git rev-parse \"$branch^{tree}\") -p $ancestor -m _)) == \"-\"* ]]; then echo $branch; fi; }; done }; fn"
+	ma               = merge --abort
+	mc               = merge --continue
+	p                = push
+	pall             = "!fn() { git pull && git submodule foreach git pull origin master; }; fn"  # Pull in remote changes for the current repository and all its submodules
+	pF               = push --force
+	pm               = "!fn() { git pull origin $(git rev-parse --abbrev-ref HEAD); }; fn"  # pull origin's current branch into local
+	prune-branches   = "!fn() { BRANCHES=$(git branch --merged | grep -v master | awk '{print $1}'); if [[ -n $BRANCHES ]]; then for b in $BRANCHES; do git branch --delete $b; done; fi; }; fn"
+	r                = rebase --gpg-sign
+	ra               = rebase --abort
+	rc               = rebase --continue
+	# res              = reset  NOTE(zchee): DO NOT COMMENT OUT. unsafe
+	reb              = "!fn() { git rebase -i HEAD~$1; }; fn"  # Interactive rebase with the given number of latest commits
+	rebase-merge     = rebase --no-ff --merge --gpg-sign
+	remote-add       = "!fn() { git remote add $(echo $1 | cut -d/ -f4) $1; }; fn"
+	remotes          = remote -v
+	reword           = commit --amend --gpg-sign  # use commit, but edit the commit message
+	rs               = rebase --skip
+	s                = status
+	w                = switch
+	see              = open
+	# tag              = tag --sign  # Always tag with GPG-sign
+	tags             = "!fn() { git tag | sort --version-sort; }; fn"  # Show verbose output about tags, branches or remotes
+	undo             = "!fn() { git reset --hard $(git rev-parse --abbrev-ref HEAD)@{${1-1}}; }; fn"  # http://postd.cc/git-undo
+	y                = "!fn() { ydiff; }; fn"
+
+	## old
+	# l                = log --pretty=oneline -n 20 --graph --abbrev-commit  # View abbreviated SHA, description, and history graph of the latest 20 commits
+	# lg               = log --color --decorate --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an (%G?)>%Creset' --abbrev-commit
+	# lg               = log --topo-order --all --graph --pretty=format:"${_git_log_oneline_format}"  # refs movement graph
+	# prune-branch     = "!fn() { $(git diff --quiet --exit-code); if [ ! $? = 0 ]; then echo \"error: Your local changes to the following files would be overwritten by checkout: $(git diff --name-only)\" && return 1; else git pull --quiet origin master && git checkout --quiet master && for b in $(git branch --merged | grep -v master | awk '{print $2}'); do git branch --delete $b; done; git checkout --quiet -; fi; }; fn"
+	# release          = "!fn() { git tag --sign -a v$1 -m 'v$1'; }; fn"  # release new version
+	# see              = "!fn() { BROWSER= hub browse $1; }; fn"  # https://github.com/paulirish/git-open, or "!see() { git web--browse https://$(git remote get-url origin | sed 's/git@github.com:/github.com\\//g'); }; see"  # Open a GitHub page in the default browser with git standalone
+	# tag              = tag --sign  # Always tag with GPG-sign
+
+[pager]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-pagerltcmdgt
+	log    = delta --true-color=always --hyperlinks -- --theme="Sublime Snazzy"  # --plus-color="#e6ffed" --minus-color="#340001"  # diff-highlight | less --tabs=4 -RFX
+	show   = delta --true-color=always --hyperlinks -- --theme="Sublime Snazzy"  # --plus-color="#e6ffed" --minus-color="#340001"  # diff-highlight | less --tabs=4 -RFX
+	diff   = delta --true-color=always --hyperlinks -- --theme="Sublime Snazzy"  # --diff-highlight --plus-color="#4a704b" --minus-color="#5e3333"  # diff-highlight | less --tabs=4 -RFX
+	blame  = delta --true-color=always --hyperlinks -- --theme="Sublime Snazzy"
+	# log    = diff-highlight | less --tabs=4 -RFX
+	# show   = diff-highlight | less --tabs=4 -RFX
+	# diff   = diff-highlight | less --tabs=4 -RFX
+	branch = false
+	config = false
+	tag    = false
+
+[color]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-color
+	# color:      normal, black, red, green, yellow, blue, magenta, cyan, white, #RGB
+	# attributes: bold, dim, ul, blink, reverse, italic, strike
+	ui = auto
+	diff = auto
+	status = auto
+	branch = auto
+	blame  = auto
+[color "branch"]
+	current = yellow bold reverse
+	local = yellow
+	remote = green
+[color "diff"]
+	meta = yellow bold
+	frag = magenta bold # line info
+	old = red # deletions
+	new = green # additions
+[color "status"]
+	added = yellow
+	changed = green
+	header = bold
+	nobranch = bold
+	unmerged = reverse
+	untracked = cyan
+	updated = yellow
+[color "blame"]
+	highlightRecent = \
+		234, 23 month ago, \
+		235, 22 month ago, \
+		236, 21 month ago, \
+		237, 20 month ago, \
+		238, 19 month ago, \
+		239, 18 month ago, \
+		240, 17 month ago, \
+		241, 16 month ago, \
+		242, 15 month ago, \
+		243, 14 month ago, \
+		244, 13 month ago, \
+		245, 12 month ago, \
+		246, 11 month ago, \
+		247, 10 month ago, \
+		248,  9 month ago, \
+		249,  8 month ago, \
+		250,  7 month ago, \
+		251,  6 month ago, \
+		252,  5 month ago, \
+		253,  4 month ago, \
+		254,  3 month ago, \
+		231,  2 month ago, \
+		230,  1 month ago, \
+		229,  3 weeks ago, \
+		228,  2 weeks ago, \
+		227,   1 week ago, \
+		226
+
+[feature]
+	experimental = true
+	manyFiles = true
+
+[i18n]
+	logOutputEncoding = UTF-8
+
+[init]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-inittemplateDir
+	# conflicted of git-codereview
+	# TODO(zchee): should change the hook scripts behavior
+	templateDir = /Users/zchee/src/github.com/zchee/dotfiles/.config/git/templates
+	defaultBranch = main
+
+[pack]
+	thread = 0
+	useSparse = true
+
+[add "interactive"]
+	useBuiltin = true
+
+[pull]
+	ff = only
+	twohead = ort
+
+[blame]
+	coloring = highlightRecent
+	date = human
+
+[apply]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-applyignoreWhitespace
+	# Detect whitespace errors when applying a patch
+	whitespace = fix
+
+[gc]
+	writeCommitGraph = true
+
+[tag]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-tagforceSignAnnotated
+	gpgSign = true
+	forceSignAnnotated = true
+	sort = version:refname
+
+[submodule]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-submoduleltnamegturl
+	fetchJobs = 10
+
+[fetch]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-fetchrecurseSubmodules
+	negotiationAlgorithm = skipping
+	recurseSubmodules = false
+	writeCommitGraph = true
+
+[commit]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-commitcleanup
+	# GPG-signed and Sign off the Developer Certificate of Origin <http://developercertificate.org>
+	# See also: <http://gerrit.googlecode.com/svn/documentation/2.0/user-signedoffby.html>
+	#           <http://stackoverflow.com/a/1962112/5228839>
+	gpgSign = false
+	verbose = true
+
+[push]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-pushdefault
+	# Use the Git 1.x.x default to avoid errors on machines with old Git
+	# installations. To use `simple` instead, add this to your `~/.extra` file:
+	# `git config --global push.default simple`. See http://git.io/mMah-w.
+	# default = matching
+	default = current
+
+[rebase]  # https://git-scm.com/docs/git-rebase#_configuration
+	autosquash = true
+	autostash = true
+	verbose = true
+	abbreviateCommands = true
+
+[diff]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-diffautoRefreshIndex
+	colorMoved = dimmed-zebra  # Similar to zebra, but additional dimming of uninteresting parts of moved code is performed. The bordering lines of two adjacent blocks are considered interesting, the rest is uninteresting.
+	compactionHeuristic = true
+	prompt = true
+	renames = copies  # Whether and how Git detects renames. If set to "false", rename detection is disabled. If set to "true", basic rename detection is enabled. If set to "copies" or "copy", Git will detect copies, as well.
+[diff "sopsdiffer"]
+	textconv = sops -d
+[diff "ansible-vault-differ"]
+	textconv = ansible-vault view
+
+[interactive]
+	diffFilter = delta --color-only
+
+[difftool]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-difftoollttoolgtpath
+	prompt = false
+	trustExitCode = true
+
+[merge] #  https://git-scm.com/docs/git-config#Documentation/git-config.txt-mergeconflictStyle
+	# Include summaries of merged commits in newly created merge commit messages
+	log = false
+
+# If you want to set up Kaleidoscope as the default merge tool,
+# then also set the following variables:
+[mergetool]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-mergetoollttoolgtpath
+	prompt = true
+
+[lfs "https://go.googlesource.com/go.git/info/lfs"]
+	locksverify = false
+
+[filter "lfs"]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-filterltdrivergtclean
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+
+[credential]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-credentialhelper
+	# store, cache, osxkeychain
+	helper = osxkeychain
+	useHttpPath = true
+[credential "https://source.developers.google.com"]
+	helper = gcloud.sh
+
+[gpg]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-gpgprogram
+	program = /usr/local/MacGPG2/bin/gpg2
+
+[help]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-helpbrowser
+	# Disable correct and execute mistyped commands
+	autocorrect = 0
+
+[advice]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-advice
+	waitingforeditor = false  # ignore "hint: Waiting for your editor to close the file..." message
+	detachedHead = false
+
+[http]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-httpproxy
+	cookiefile = ~/.config/git/cookies
+	saveCookies = true
+	maxRequests = 20
+	postBuffer = 157286400
+[http "https://gopkg.in"]
+	followRedirects = true
+
+## https://git-scm.com/docs/git-config#Documentation/git-config.txt-urlltbasegtinsteadOf
+[url "git@github.com:zchee"]  # github
+	insteadOf = "https://github.com/zchee"
+	pushInsteadOf = "git://github.com/zchee"
+[url "git@bitbucket.org:zchee"]  # bitbucket
+	insteadOf = "https://bitbucket.org/zchee"
+	pushInsteadOf = "git://bitbucket.org/zchee"
+[url "git@gitlab.com:zchee"]  # gitlab
+	insteadOf = "https://gitlab.com/zchee"
+	pushInsteadOf = "git://gitlab.com/zchee"
+
+[maintenance]
+	strategy = incremental
+
+[maintenance "commit-graph"]
+	auto = 500
+
+[include]  # https://git-scm.com/docs/git-config#_includes
+	path = orgs.config
+	path = mercari.config
+
+[ghq]
+	root = ~/src
+
+# vim:ft=gitconfig
