@@ -18,23 +18,28 @@ readonly filter
 
 trap INT ABRT TERM
 
-for gomod in $(find . -type f -name 'go.mod' -not -iwholename '*vendor*' -not -iwholename '*testdata*' -not -iwholename '*example*' -not -iwholename './tools/go.mod' -not -iwholename '*/_*');
+for gomod in $(find -O3 . -type f -name 'go.mod' -not -iwholename '*vendor*' -not -iwholename '*not*' -not -iwholename '*testdata*' -not -iwholename '*test*' -not -iwholename '*example*' -not -iwholename './tools/go.mod' -not -iwholename '*/_*');
 do
   MODROOT="$(realpath $(dirname "$gomod"))"
 
   pushd "${MODROOT}" > /dev/null 2>&1
-  
-  if [[ "$MODROOT" != '/usr/local/go'* ]]; then
-    ${GO} mod vendor -v
+
+  if [[ "${MODROOT}" != '/usr/local/go'* ]]; then
+    ${GO} mod vendor
   fi
-  
-  PKGS="$(${GO} list -f="$filter" ./... | tr '\n' ' ')"
-  eval "${GO} install -v -x -mod=vendor $PKGS"
-  # echo "PKGS: $PKGS"  # debug
-  
+
+  PKGS="$(${GO} list -mod=readonly -f="${filter}" ./... | grep -v -e 'third_party' | tr '\n' ' ')"
+  # echo "PKGS: ${PKGS}"  # debug
+  eval "${GO} install -mod=readonly -v -x ${PKGS}"
+
+  modmode='vendor'
+  if [[ -n "$(go env GOWORK)" ]]; then
+     modmode='readonly'
+  fi
+
   if [[ -d "$(dirname "$gomod")/vendor" ]]; then
-    VENDOR_PKGS="$(${GO} list -f="$filter" "$MODROOT"/vendor/... | tr '\n' ' ')"
-    eval "${GO} install -v -x -mod=vendor $VENDOR_PKGS" || true
+    VENDOR_PKGS="$(${GO} list -mod=${modmode} -f="$filter" "$MODROOT"/vendor/... | tr '\n' ' ' || true)"
+    eval "${GO} install -mod=readonly -v -x $VENDOR_PKGS" || true
     # echo "VENDOR_PKGS: $VENDOR_PKGS"  # debug
   fi
 
