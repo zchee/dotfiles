@@ -8,19 +8,26 @@ if [[ "$CWD" != *'golang.org/x/tools'* ]]; then
 fi
 
 GO=${GO:-$(which go)}
+
 export CGO_ENABLED=0
+export GOCACHE="$(mktemp -d)"
 
 buildtags='osusergo,netgo,static'
 readonly buildtags
 
-PACKAGES="$(go list -f='{{ if eq .Name "main" }}{{ .ImportPath }}{{ end }}' ./... | grep -v -e 'cmd/getgo/server' -e 'internal/lsp/helper' -e 'internal/stack/gostacks' | tr '\n' ' ')"
-readonly PACKAGES
+BINARIES="$(go list -f='{{ if eq .Name "main" }}{{ .ImportPath }}{{ end }}' ./... | grep -v -e 'cmd/getgo/server' -e 'internal/lsp/helper' -e 'internal/stack/gostacks' | tr '\n' ' ')"
+readonly BINARIES
 
-$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode=external "-extldflags=-static-pie -fno-PIC"' ${PACKAGES}
+# Install tools binaries
+$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode external -buildid= "-extldflags=-static-pie -fPIE -mdynamic-no-pic"' ${BINARIES}
 
+# Install gopls
 pushd "$(go env GOPATH)/src/golang.org/x/tools/gopls" > /dev/null 2>&1
-$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode=external "-extldflags=-static-pie -fno-PIC"' .
+$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode external -buildid= "-extldflags=-static-pie -fPIE -mdynamic-no-pic"' ./
+pushd "${CWD}" > /dev/null 2>&1
 
+pushd "$(go env GOPATH)/src/golang.org/x/tools/go/analysis/unitchecker" > /dev/null 2>&1
+$GO build -o "$(go env GOPATH)/bin/unitchecker" -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode external -buildid= "-extldflags=-static-pie -fPIE -mdynamic-no-pic"' main.go
 pushd "${CWD}" > /dev/null 2>&1
 
 rm -f $(go env GOPATH)/bin/bundle
