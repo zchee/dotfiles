@@ -7,7 +7,7 @@ command -v rg >/dev/null 2>&1 || { error "command not found: rg"; }
 
 GOPATH="$(go env GOPATH)"
 
-PATTERN="$1"
+readonly PATTERN="$1"
 shift
 
 exec "$(which rg)" \
@@ -16,7 +16,11 @@ exec "$(which rg)" \
   --mmap \
   --no-config \
   --no-ignore-vcs \
-  --pretty --colors=match:fg:yellow --colors=match:bg:black --colors=path:fg:magenta \
+  --pretty \
+  --colors=match:fg:yellow \
+  --colors=match:bg:black \
+  --colors=path:fg:blue \
+  --colors=path:style:bold \
   --threads=16 \
   --type go \
   --glob='!{_*,zz_generated.*.go,bindata.go}' \
