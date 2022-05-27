@@ -26,11 +26,13 @@ fi
 
 if [[ "$#" -lt 2 ]]; then
   if [[ "$1" == '-l' ]]; then
-    find "$GIIGNORE_REPOSITORY" -maxdepth 2 -type f -name '*.gitignore' | sort | cut -d '/' -f 8-9 | sed "s|.gitignore||g"
+    find "$GIIGNORE_REPOSITORY" -maxdepth 3 -type f -name '*.gitignore' | cut -d '/' -f 8-9 | sed "s|.gitignore||g" | sort --unique
     exit 0
   fi
   usage
 fi
+
+AUTHOR=${AUTHOR:-$(basename "$(dirname "$PWD")")/$(basename "$PWD")}
 
 ARG_LICENSE="$1"
 shift
@@ -104,43 +106,50 @@ cat << EOF >> .gitattributes
 # AUTHOR project gitattributes file
 #  https://github.com/github/linguist/blob/master/docs/overrides.md
 
-# To prevent CRLF breakages on Windows for fragile files, like testdata.
 * -text
 
 docs        linguist-documentation
 EOF
 
-declare EXISTS=true
+declare exists=false
 for lang in "${ARG_LANGUAGES[@]}"; do
-  LANGUAGE_IGNORE_FILE="${lang}.gitignore"
+  LANGUAGE_IGNORE="${lang}"
   if [[ $lang == 'go-pkg' ]] || [[ $lang == 'go-simple' ]]; then
-    LANGUAGE_IGNORE_FILE="Go.gitignore"
-  fi
-  if [[ ! -f "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE_FILE" ]]; then
-    if [[ -f "$GIIGNORE_REPOSITORY/Global/${lang}.gitignore" ]]; then
-      # Global
-      LANGUAGE_IGNORE_FILE="Global/${lang}.gitignore"
-    elif [[ -f "$GIIGNORE_REPOSITORY/community/${lang}.gitignore" ]]; then
-      # community
-      LANGUAGE_IGNORE_FILE="community/${lang}.gitignore"
-    else
-      warn "Not found ${lang}.gitignore"
-      EXISTS=false
-    fi
+    LANGUAGE_IGNORE="Go"
   fi
 
-  if $EXISTS; then
-    printf "\\n# github/gitignore/%s" "${LANGUAGE_IGNORE_FILE^}" >> .gitignore
-    printf "\\n%s\\n" "$(cat "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE_FILE")" >> .gitignore
+  declare file
+  if [[ -f "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE.gitignore" ]]; then
+    file="$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE.gitignore"
+    exists=true
+  elif [[ -d "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE" ]]; then
+    file="$(find "$GIIGNORE_REPOSITORY/$LANGUAGE_IGNORE" -name '*.AllowList.gitignore')"
+    exists=true
+  else
+    warn "Not found ${lang} gitignore"
+  fi
+
+  if $exists; then
+    printf "\\n# github/gitignore/%s" "${LANGUAGE_IGNORE^}" >> .gitignore
+    printf "\\n%s\\n" "$(cat "$file")" >> .gitignore
   fi
 
   case "$lang" in
-    go | Go | go-old)
-      sed -i 's|Dependency directories (remove the comment below to include it)|Dependency directories|' .gitignore
-      sed -i 's|# vendor/|vendor/|' .gitignore
+    go | Go | go-old | community/Golang)
 
-      {
-        echo "
+    case "$lang" in
+      community/Golang)
+        sed -i 's|# But not these files...|!/.gitattributes|' .gitignore
+        sed -i 's|# !Makefile|!Makefile|' .gitignore
+        sed -i ':a;N;$!ba;s|#\n# Recommended: Go.AllowList.gitignore\n||' .gitignore
+        sed -i ':a;N;$!ba;s|# ...even if they are in subdirectories\n||' .gitignore
+        ;;
+      go | Go | go-old)
+        sed -i 's|Dependency directories (remove the comment below to include it)|Dependency directories|' .gitignore
+        sed -i 's|# vendor/|vendor/|' .gitignore
+
+        {
+          echo "
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
 *.a
@@ -172,8 +181,9 @@ bench.txt
 *.pprof
 
 # coverage
-coverage.*"
-      } >> .gitignore
+coverage.out"
+        } >> .gitignore
+    esac
 
       # write .gitattributes
       cat << EOF >> .gitattributes
@@ -186,7 +196,7 @@ EOF
       cp -r "$XDG_CONFIG_HOME/boilerplate/.github" .github
       sed -i "s|PKG|$PROJECT_NAME|g" .github/ISSUE_TEMPLATE/bug_report.yml
 
-      sed -i "s|AUTHOR|$(basename "$(dirname "$PWD")")/$(basename "$PWD")|" .gitignore .gitattributes
+      sed -i "s|AUTHOR|$AUTHOR|" .gitignore .gitattributes
 
       # golangci-lint
       cp "$XDG_CONFIG_HOME/boilerplate/go/.golangci.yml" .
@@ -200,19 +210,8 @@ EOF
       sed -i "s|YEAR|$(date +%Y)|g" hack/boilerplate/boilerplate.*.txt
 
       # create root go.mod
-      go mod init && go mod edit -go=1.17
+      go mod init && go mod edit -go=1.18
       touch go.sum
-
-      # create tools directory
-      mkdir -p tools
-      pushd tools > /dev/null 2>&1
-      go mod init && go mod edit -go=1.17
-      cat "$XDG_CONFIG_HOME/boilerplate/go/boilerplate.go.tools.txt" > tools.go
-      sed -i "s|AUTHOR|$AUTHOR|g" tools.go
-      sed -i "s|YEAR|$(date +%Y)|g" tools.go
-      go mod edit -require=golang.org/x/tools@master -require=mvdan.cc/gofumpt@master -replace=mvdan.cc/gofumpt=github.com/mvdan/gofumpt@master
-      go mod tidy -v
-      popd > /dev/null 2>&1
 
       # write Makefile
       if [[ "$lang" != "go" ]]; then
