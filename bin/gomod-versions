@@ -8,7 +8,7 @@ error() { printf "\x1b[1;31m[ERROR]\x1b[0m %s\\n" "$1" >&2; exit 1; }
 type go >/dev/null 2>&1 || { error "go command not found"; }
 
 if [[ "$#" -eq 2 && "$1" == 'latest' ]]; then
-  go list -u -m -versions -mod=mod "$2@upgrade" | awk -F' ' '{print $NF}'
+  go list -u -m -versions -mod=mod "$2" | awk -F' ' '{print $NF}'
 else
   go list -u -m -versions -mod=mod "$1"
 fi
