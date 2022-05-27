@@ -11,16 +11,17 @@ fi
 REPOSITORY=("$($find_cmd . -maxdepth 1 -not -path . \( -type d -or -type l \) -and \( ! -iname ".*" \) \( ! -iname "*mirror*" \) \( ! -iname "_*" \) \( ! -iname "*build" \) \( ! -iname "*tmp*" \))")
 
 printf "\\x1b[34m[INFO]\\x1b[0m Target repositories\\n"
+
 for r in ${REPOSITORY[*]}
 do
   echo "+ $r"
 done
 
 touch "$TMPDIR/fetch-parallel-failed"
-if hash parallel 2>/dev/null; then
 
+if hash parallel 2>/dev/null; then
   # shellcheck disable=SC2016
-  parallel -j "$CUPS" 'test -d {}/.git || git -C {} fetch --all && git -C {} pull origin $(git -C {} rev-parse --abbrev-ref HEAD) || { echo "{}" >> $TMPDIR/fetch-parallel-failed; }' ::: "${REPOSITORY[@]}"
+  parallel -j "$CUPS" 'test -d {}/.git || git -C {} fetch --all --prune --auto-gc --verbose && git -C {} fetch --tags --force --auto-gc --verbose && git -C {} pull origin $(git -C {} rev-parse --abbrev-ref HEAD) || { echo "{}" >> $TMPDIR/fetch-parallel-failed; }' ::: "${REPOSITORY[@]}"
 else
   for r in "${REPOSITORY[@]}"
   do
