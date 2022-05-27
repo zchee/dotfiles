@@ -11,9 +11,13 @@ exec "$(which rg)" \
   --type go \
   --type asm \
   --mmap \
-  --threads=16 \
+  --threads=$(( $(nproc) + 1)) \
   --block-buffered \
-  --pretty --colors=match:fg:yellow --colors=match:bg:black --colors=path:fg:magenta \
+  --pretty \
+  --colors=match:fg:yellow \
+  --colors=match:bg:black \
+  --colors=path:fg:blue \
+  --colors=path:style:bold \
   --no-ignore-vcs \
   --glob='!{_*,zz_generated.*.go,bindata.go}' \
   --glob='!{vendor,staging,third_party}' \
