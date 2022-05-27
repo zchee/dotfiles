@@ -9,14 +9,15 @@ clone_path="${1#https://}"
 readonly clone_path
 import_path="${clone_path#github.com/}"
 readonly import_path
+gopath=$(go env GOPATH)
+readonly gopath
 
-if [[ ! -d "$(go env GOPATH)/src/$clone_path" ]]; then
-  mkdir -p "$(go env GOPATH)/src/$(dirname "$clone_path")"
-  if ! git clone "https://github.com/$import_path.git" "$(go env GOPATH)/src/$clone_path" 2> /dev/null; then
-    url=$(curl -siL "https://$clone_path?go-get=1" | grep go-import -C 3 | grep 'git https://' | sed -E "s|git (https://.*)['\"]>|\1|" | awk '{print $4}')
-    # git clone "git@github.com:${url#https://github.com/}" "$(go env GOPATH)/src/$clone_path"
-    git clone "${url}" "$(go env GOPATH)/src/$clone_path"
+if [[ ! -d "${gopath}/src/$clone_path" ]]; then
+  mkdir -p "${gopath}/src/$(dirname "$clone_path")"
+  if ! git clone "https://github.com/$import_path.git" "${gopath}/src/$clone_path" 2> /dev/null; then
+    url=$(curl -siL "https://$clone_path?go-get=1" | grep go-import -C 3 | grep 'git https://' | sed -E "s|git (https://.*)['\"]>|\1|" | awk -F'https' '{print "https"$2}' | cut --delimiter='"' -f1)
+    git clone "${url}" "${gopath}/src/$clone_path"
   fi
 else
-  git -C "$(go env GOPATH)/src/$clone_path" pull --ff-only
+  git -C "${gopath}/src/$clone_path" pull --ff-only
 fi
