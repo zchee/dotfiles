@@ -1,0 +1,117 @@
+# apko lima configuration file
+#
+#   To start environment:
+#     limactl start --tty=false apko.yaml
+#
+#   To obtain root shell (needed for apko build):
+#     limactl shell apko sudo su -c "HOME=\"${HOME}\" ash"
+#
+#   Build an example image:
+#     apko build /examples/nginx.yaml tag /tmp/output.tar
+#
+#   Publish an example image:
+#      apko publish /examples/nginx.yaml <registry_ref>
+#   
+#   To delete environment:
+#     limactl delete -f apko
+#
+images:
+- location: https://github.com/lima-vm/alpine-lima/releases/download/v0.2.16/alpine-lima-std-3.15.4-x86_64.iso
+  arch: "x86_64"
+  digest: "sha512:88567d993357cab489dcde84208e2379dea2d2964237deca4d114bfd2ab22a3f427436f7e041b8db0e51a76b6cc7e37aaa7395340f3cc3cdeb1f95c60b3c732b"
+- location: https://github.com/lima-vm/alpine-lima/releases/download/v0.2.16/alpine-lima-std-3.15.4-aarch64.iso
+  arch: "aarch64"
+  digest: "sha512:585154039f930e283c36c4f9fd802e76befae382d1d400a47e288bd69d80efbf9a288902119c3b61eb63053d3d4e6432149a4b2dd8679d504d7e812ec4f4e7bf"
+
+cpus: 10
+memory: 16GiB
+disk: 10GiB
+
+firmware:
+  legacyBIOS: true
+
+containerd:
+  system: false
+  user: false
+
+mountType: "9p"
+mounts:
+- location: "~"
+  9p:
+    # Supported security models are "passthrough", "mapped-xattr", "mapped-file" and "none". default: "mapped-xattr"
+    securityModel: null
+    # Select 9P protocol version. Valid options are: "9p2000" (legacy), "9p2000.u", "9p2000.L". default: "9p2000.L"
+    protocolVersion: null
+    # The number of bytes to use for 9p packet payload, where 4KiB is the absolute minimum. default: "128KiB"
+    msize: null
+    # Specifies a caching policy. Valid options are: "none", "loose", "fscache" and "mmap".
+    # Try choosing "mmap" or "none" if you see a stability issue with the default "fscache".
+    # See https://www.kernel.org/doc/Documentation/filesystems/9p.txt
+    # default: "fscache" for non-writable mounts, "mmap" for writable mounts
+    cache: null
+
+provision:
+- mode: system
+  script: |
+    #!/bin/ash
+    set -eux -o pipefail
+    # Install apko from Alpine edge repo
+    apk add apko -X https://dl-cdn.alpinelinux.org/alpine/edge/testing/
+    # Add useful tools like vim
+    apk update
+    apk add vim
+    # Add Docker credential helpers needed for pushing to various cloud registries
+    arch="$(uname -m)"
+    if [[ "${arch}" != "x86_64" ]] && [[ "${arch}" != "aarch64" ]]; then
+      echo "Unsupported arch: ${arch}. Exiting."
+      exit 1
+    fi
+    # 1. docker-credential-gcr (Google)
+    # https://github.com/GoogleCloudPlatform/docker-credential-gcr/releases
+    if [[ "${arch}" == "x86_64" ]]; then
+      wget -O tmp.tar.gz https://github.com/GoogleCloudPlatform/docker-credential-gcr/releases/download/v2.1.0/docker-credential-gcr_linux_amd64-2.1.0.tar.gz
+      sha256sum tmp.tar.gz | grep '^91cca7b5ca33133bcd217982be31d670efe7f1a33eb5be72e014f74feecac00f '
+    else
+      wget -O tmp.tar.gz https://github.com/GoogleCloudPlatform/docker-credential-gcr/releases/download/v2.1.0/docker-credential-gcr_linux_arm64-2.1.0.tar.gz
+      sha256sum tmp.tar.gz | grep '^0fcde1af46a4ddc3135a673b61707a4e241b5fc994d493c6c0c03e9ebcf5eee4 '
+    fi
+    tar -xvf tmp.tar.gz docker-credential-gcr
+    chmod +x docker-credential-gcr
+    mv docker-credential-gcr /usr/bin
+    rm -f tmp.tar.gz
+    # 2. docker-credential-ecr-login (Amazon)
+    # https://github.com/awslabs/amazon-ecr-credential-helper/releases
+    if [[ "${arch}" == "x86_64" ]]; then
+      wget -O docker-credential-ecr-login https://amazon-ecr-credential-helper-releases.s3.us-east-2.amazonaws.com/0.6.0/linux-amd64/docker-credential-ecr-login
+      sha256sum docker-credential-ecr-login | grep '^af805202cb5d627dde2e6d4be1f519b195fd5a3a35ddc88d5010b4a4e5a98dd8 '
+    else
+      wget -O docker-credential-ecr-login https://amazon-ecr-credential-helper-releases.s3.us-east-2.amazonaws.com/0.6.0/linux-arm64/docker-credential-ecr-login
+      sha256sum docker-credential-ecr-login | grep '^760ecd36acf720cfe6a6ddb6fb20a32845e8886ea2e5333441c4bcca0a1d9620 '
+    fi
+    chmod +x docker-credential-ecr-login
+    mv docker-credential-ecr-login /usr/bin
+    # 3. docker-credential-acr-env (Microsoft)
+    # https://github.com/chrismellard/docker-credential-acr-env/releases
+    # No version yet available for aarch64, skipping.
+    # See: https://github.com/chrismellard/docker-credential-acr-env/issues/6
+    # 4. docker-credential-osxkeychain (mac system)
+    # Add a dummy version of docker-credential-osxkeychain typically found
+    # in mac ~/.docker/config.json
+    echo '#!/bin/ash' > /usr/bin/docker-credential-osxkeychain
+    echo 'echo "{\"ServerURL\":\"${1}\",\"Username\":\"\",\"Secret\":\"\"}"' \
+      >> /usr/bin/docker-credential-osxkeychain
+    chmod +x /usr/bin/docker-credential-osxkeychain
+    # Get the examples/ dir from GitHub release, place at /examples
+    wget https://github.com/chainguard-dev/apko/archive/refs/heads/main.zip
+    unzip main.zip "apko-main/examples/*" -d /examples -j
+    rm -f main.zip
+message: |-
+  ---
+  Run the following to get a root shell (needed to run apko build):
+    limactl shell apko-playground sudo su -c "HOME=\"${HOME}\" ash"
+  
+  Try building an image:
+    apko build /examples/nginx.yaml tag /tmp/output.tar
+  Try publishing an image:
+    apko publish /examples/nginx.yaml <registry_ref>
+  ---
