@@ -1,7 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
-
-CUPS="$(getconf _NPROCESSORS_ONLN)"
 
 find_cmd="$(which find)"
 if $find_cmd --version | grep GNU > /dev/null; then
@@ -12,6 +10,7 @@ REPOSITORY=("$($find_cmd . -maxdepth 1 -not -path . \( -type d -or -type l \) -a
 
 printf "\\x1b[34m[INFO]\\x1b[0m Target repositories\\n"
 
+# shellcheck disable=SC2048
 for r in ${REPOSITORY[*]}
 do
   echo "+ $r"
@@ -21,7 +20,7 @@ touch "$TMPDIR/fetch-parallel-failed"
 
 if hash parallel 2>/dev/null; then
   # shellcheck disable=SC2016
-  parallel -j "$CUPS" 'test -d {}/.git || git -C {} fetch --all --prune --auto-gc --verbose && git -C {} fetch --tags --force --auto-gc --verbose && git -C {} pull origin $(git -C {} rev-parse --abbrev-ref HEAD) || { echo "{}" >> $TMPDIR/fetch-parallel-failed; }' ::: "${REPOSITORY[@]}"
+  parallel -j "$(getconf _NPROCESSORS_ONLN)" 'test -d {}/.git || git -C {} fetch --all --prune --auto-gc --verbose && git -C {} fetch --tags --force --auto-gc --verbose && git -C {} pull origin $(git -C {} rev-parse --abbrev-ref HEAD) || { echo "{}" >> $TMPDIR/fetch-parallel-failed; }' ::: "${REPOSITORY[@]}"
 else
   for r in "${REPOSITORY[@]}"
   do
