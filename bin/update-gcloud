@@ -62,7 +62,7 @@ info "Install gcloud components..."
   app-engine-python-extras \
   beta \
   bq \
-  cloud-build-local \
+  cloud-run-proxy \
   cloud_sql_proxy \
   config-connector \
   core \
@@ -76,10 +76,13 @@ info "Install gcloud components..."
   local-extract \
   minikube \
   nomos \
+  package-go-module \
   pkg \
   pubsub-emulator \
   skaffold \
-  terraform-validator
+  terraform-tools
+  # cloud-build-local \
+  # terraform-validator
   # anthos-auth  \
   # app-engine-php \
   # appctl \
