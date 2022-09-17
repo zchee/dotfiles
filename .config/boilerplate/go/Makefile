@@ -91,7 +91,7 @@ lint/golangci-lint: tools/bin/golangci-lint .golangci.yaml  ## Run golangci-lint
 define build_tool
 cd ${TOOLS_DIR}; \
 for t in ${TOOLS}; do \
-	if [ -z '$1' ] || [ $$(basename $$t) = '$1' ]; then \
+	if [ -z '$1' ] || [ $$(basename $${t%%/v*}) = '$1' ]; then \
 		echo "Install $$t ..." >&2; \
 		GOBIN=${TOOLS_BIN} CGO_ENABLED=0 go install -v -mod=readonly ${GO_FLAGS} "$${t}"; \
 	fi \
