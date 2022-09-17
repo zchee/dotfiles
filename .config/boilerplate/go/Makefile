@@ -1,10 +1,7 @@
 # -----------------------------------------------------------------------------
 # global
 
-.DEFAULT_GOAL := test
-comma := ,
-empty :=
-space := $(empty) $(empty)
+.DEFAULT_GOAL := help
 
 # -----------------------------------------------------------------------------
 # go
@@ -13,16 +10,20 @@ GO_PATH ?= $(shell go env GOPATH)
 GO_OS ?= $(shell go env GOOS)
 GO_ARCH ?= $(shell go env GOARCH)
 
-PKG := $(subst $(GO_PATH)/src/,,$(CURDIR))
+PACKAGES := $(subst $(GO_PATH)/src/,,$(CURDIR))
 CGO_ENABLED ?= 0
-GO_BUILDTAGS=osusergo netgo static
-GO_LDFLAGS=-s -w "-extldflags=-static"
-GO_FLAGS ?= -tags='$(subst $(space),$(comma),${GO_BUILDTAGS})' -ldflags='${GO_LDFLAGS}' -installsuffix=netgo
+GO_BUILDTAGS=osusergo,netgo,static
+GO_LDFLAGS=-s -w
+ifeq (${GO_OS},linux)
+GO_LDFLAGS+=-d
+endif
+GO_LDFLAGS+=-buildid= "-extldflags=-static"
+GO_FLAGS ?= -tags='${GO_BUILDTAGS}' -ldflags='${GO_LDFLAGS}'
 
-GO_PKGS := $(shell go list ./...)
-GO_TEST_PKGS ?= $(shell go list -f='{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
+GO_PACKAGES = $(shell go list ./...)
+GO_TEST_PACKAGES ?= $(shell go list -f='{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./...)
 
-GO_TEST ?= ${TOOLS_BIN}/gotestsum --
+GO_TEST ?= ${TOOLS_BIN}/gotestsum -f standard-verbose --
 GO_TEST_FLAGS ?= -race -count=1 -shuffle=on
 GO_TEST_FUNC ?= .
 GO_COVERAGE_OUT ?= coverage.out
@@ -30,10 +31,11 @@ GO_BENCH_FLAGS ?= -benchmem
 GO_BENCH_FUNC ?= .
 GO_LINT_FLAGS ?=
 
-TOOLS := $(shell cd tools; go list -f '{{ join .Imports " " }}' -tags=tools)
-TOOLS_BIN := ${CURDIR}/tools/bin
+TOOLS_DIR := ${CURDIR}/tools
+TOOLS_BIN := ${TOOLS_DIR}/bin
+TOOLS = $(shell cd ${TOOLS_DIR}; go list -f '{{ join .Imports " " }}' -tags=tools)
 
-JOBS := $(shell getconf _NPROCESSORS_CONF)
+JOBS = $(shell getconf _NPROCESSORS_CONF)
 
 # -----------------------------------------------------------------------------
 # defines
@@ -45,6 +47,13 @@ endef
 # -----------------------------------------------------------------------------
 # target
 
+##@ build
+
+.PHONY: build
+build/%:  ## Build command.
+	$(call target)
+	CGO_ENABLED=${CGO_ENABLED} go build -o ${GO_BIN}/$* $(strip ${GO_FLAGS}) ./cmd/$*
+
 ##@ test, bench, coverage
 
 .PHONY: test
@@ -52,53 +61,50 @@ test: CGO_ENABLED=1
 test: GO_FLAGS=-tags='$(subst ${space},${comma},${GO_BUILDTAGS})'
 test: tools/bin/gotestsum  ## Runs package test including race condition.
 	$(call target)
-	@CGO_ENABLED=${CGO_ENABLED} GOTESTSUM_FORMAT=standard-verbose ${GO_TEST} ${GO_TEST_FLAGS} -run=${GO_TEST_FUNC} $(strip ${GO_FLAGS}) ${GO_TEST_PKGS}
-
-.PHONY: bench
-bench: GO_TEST=go test
-bench:  ## Take a package benchmark.
-	$(call target)
-	@CGO_ENABLED=${CGO_ENABLED} ${GO_TEST} -run='^$$' -bench=${GO_BENCH_FUNC} ${GO_BENCH_FLAGS} $(strip ${GO_FLAGS}) ${GO_TEST_PKGS}
+	@CGO_ENABLED=${CGO_ENABLED} GOTESTSUM_FORMAT=standard-verbose ${GO_TEST} ${GO_TEST_FLAGS} -run=${GO_TEST_FUNC} $(strip ${GO_FLAGS}) ${GO_TEST_PACKAGES}
 
 .PHONY: coverage
 coverage: CGO_ENABLED=1
 coverage: GO_FLAGS=-tags='$(subst ${space},${comma},${GO_BUILDTAGS})'
 coverage: tools/bin/gotestsum  ## Takes packages test coverage.
 	$(call target)
-	@CGO_ENABLED=${CGO_ENABLED} ${GO_TEST} ${GO_TEST_FLAGS} -covermode=atomic -coverpkg=${PKG}/... -coverprofile=${GO_COVERAGE_OUT} $(strip ${GO_FLAGS}) ${GO_PKGS}
-
+	@CGO_ENABLED=${CGO_ENABLED} ${GO_TEST} ${GO_TEST_FLAGS} -covermode=atomic -coverpkg=./... -coverprofile=${GO_COVERAGE_OUT} $(strip ${GO_FLAGS}) ${GO_PACKAGES}
 
 ##@ fmt, lint
-
-.PHONY: lint
-lint: fmt lint/golangci-lint  ## Run all linters.
 
 .PHONY: fmt
 fmt: tools/bin/goimportz tools/bin/gofumpt  ## Run goimportz and gofumpt.
 	$(call target)
-	${TOOLS_BIN}/goimportz -local=${PKG},$(subst /jsonrpc2,,$(PKG)) -w $(shell find . -iname "*.go" -not -path "./vendor/**")
-	${TOOLS_BIN}/gofumpt -s -extra -w $(shell find . -iname "*.go" -not -path "./vendor/**")
+	@${TOOLS_BIN}/goimportz -local=${PACKAGES} -w $(shell find $$PWD -iname "*.go" -not -iname "*pb.go" -not -iwholename "*vendor*")
+	@${TOOLS_BIN}/gofumpt -extra -w $(shell find $$PWD -iname "*.go" -not -iname "*pb.go" -not -iwholename "*vendor*")
+
+.PHONY: lint
+lint: lint/golangci-lint  ## Run all linters.
 
 .PHONY: lint/golangci-lint
-lint/golangci-lint: tools/bin/golangci-lint .golangci.yml  ## Run golangci-lint.
+lint/golangci-lint: tools/bin/golangci-lint .golangci.yaml  ## Run golangci-lint.
 	$(call target)
-	${TOOLS_BIN}/golangci-lint -j ${JOBS} run $(strip ${GO_LINT_FLAGS}) ./...
-
+	@${TOOLS_BIN}/golangci-lint -j ${JOBS} run $(strip ${GO_LINT_FLAGS}) ./...
 
 ##@ tools
 
+define build_tool
+cd ${TOOLS_DIR}; \
+for t in ${TOOLS}; do \
+	if [ -z '$1' ] || [ $$(basename $$t) = '$1' ]; then \
+		echo "Install $$t ..." >&2; \
+		GOBIN=${TOOLS_BIN} CGO_ENABLED=0 go install -v -mod=readonly ${GO_FLAGS} "$${t}"; \
+	fi \
+done
+endef
+
+tools/bin/%: ${TOOLS_DIR}/go.mod ${TOOLS_DIR}/go.sum
+tools/bin/%:  ## Install an individual dependency tool
+	$(call build_tool,$(@F))
+
 .PHONY: tools
-tools: tools/bin/''  ## Install tools
-
-tools/bin/%: ${CURDIR}/tools/go.mod ${CURDIR}/tools/go.sum
-	@cd tools; \
-	  for t in ${TOOLS}; do \
-			if [ -z '$*' ] || [ $$(basename $$t) = '$*' ]; then \
-				echo "Install $$t ..."; \
-				GOBIN=${TOOLS_BIN} CGO_ENABLED=0 go install -v -mod=mod ${GO_FLAGS} "$${t}"; \
-			fi \
-	  done
-
+tools:  ## Install tools
+	$(call build_tool)
 
 ##@ clean
 
@@ -107,24 +113,22 @@ clean:  ## Cleanups binaries and extra files in the package.
 	$(call target)
 	@rm -rf *.out *.test *.prof trace.txt ${TOOLS_BIN}
 
-
-##@ miscellaneous
-
-.PHONY: todo
-todo:  ## Print the all of (TODO|BUG|XXX|FIXME|NOTE) in packages.
-	@grep -E '(TODO|BUG|XXX|FIXME)(\(.+\):|:)' $(shell find . -type f -name '*.go' -and -not -iwholename '*vendor*')
-
-.PHONY: env/%
-env/%: ## Print the value of MAKEFILE_VARIABLE. Use `make env/GO_FLAGS` or etc.
-	@echo $($*)
-
-.PHONY: nolint
-nolint:  ## Print the all of //nolint:... pragma in packages.
-	@rg -t go -C 3 -e '//nolint.+' --follow --hidden --glob='!vendor' --glob='!internal'
-
-
 ##@ help
 
 .PHONY: help
 help:  ## Show this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[33m<target>\033[0m\n"} /^[a-zA-Z_0-9\/%_-]+:.*?##/ { printf "  \033[1;32m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ misc
+
+.PHONY: todo
+todo:  ## Print the all of (TODO|BUG|XXX|FIXME|NOTE) in packages.
+	@grep -E '(TODO|BUG|XXX|FIXME)(\(.+\):|:)' $(shell find . -type f -name '*.go' -and -not -iwholename '*vendor*')
+
+.PHONY: nolint
+nolint:  ## Print the all of //nolint:... pragma in packages.
+	@rg -t go -C 3 -e '//nolint.+' --follow --hidden --glob='!vendor' --glob='!internal'
+
+.PHONY: env/%
+env/%: ## Print the value of MAKEFILE_VARIABLE. Use `make env/GO_FLAGS` or etc.
+	@echo $($*)
