@@ -4,7 +4,7 @@ set -euo pipefail
 BIN="${0##*-}"
 
 info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
-error() { printf "\\x1b[1;31m[ERROR]\\x1b[0m %s\\n\\n" "$1"; }
+error() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; exit 1; }
 
 [[ ! $# -eq 1 ]] && { echo "[ERROR] Usage: $BIN [VERSION]"; exit 1; }
 VERSION=$1
@@ -49,49 +49,69 @@ if [[ -f "$CLOUDSDK_ROOT_DIR/properties" ]]; then
   mv "$CLOUDSDK_ROOT_DIR" /tmp
 fi
 
+install_path=
+case $(uname -m) in
+  x86_64)
+    install_path='/usr/local'
+    ;;
+
+  arm64)
+    install_path='/opt/local'
+    ;;
+esac
 
 info "Install google-cloud-sdk $VERSION for $OS..."
-curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-"$VERSION"-"$OS"-x86_64.tar.gz | tar -C /usr/local -xzf -
+curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-"$VERSION"-"$OS"-x86_64.tar.gz | tar -C "${install_path}" -xzf -
 
 info "Install gcloud components..."
-/usr/local/google-cloud-sdk/install.sh --usage-reporting=false --command-completion=false --path-update=false --install-python=true --quiet --additional-components \
+"${install_path}/google-cloud-sdk/install.sh" --usage-reporting=false --command-completion=false --path-update=false --install-python=true --quiet --additional-components \
   alpha \
-  app-engine-go \
-  app-engine-java \
-  app-engine-python \
-  app-engine-python-extras \
   beta \
   bq \
   cloud-run-proxy \
-  cloud_sql_proxy \
   config-connector \
   core \
   docker-credential-gcr \
+  gcloud-crc32c \
+  gcloud-deps \
   gcloud-man-pages \
+  gke-gcloud-auth-plugin \
   gsutil \
   kpt \
   kubectl \
   kubectl-oidc \
-  kustomize \
   local-extract \
-  minikube \
-  nomos \
+  log-streaming \
   package-go-module \
   pkg \
-  pubsub-emulator \
   skaffold \
   terraform-tools
-  # cloud-build-local \
-  # terraform-validator
+
   # anthos-auth  \
+  # app-engine-go \
+  # app-engine-grpc \
+  # app-engine-java \
   # app-engine-php \
+  # app-engine-python \
+  # app-engine-python-extras \
   # appctl \
   # bigtable \
   # cbt  \
   # cloud-datastore-emulator  \
   # cloud-firestore-emulator \
+  # cloud_sql_proxy \
+  # dataflow-sql \
   # datalab \
   # emulator-reverse-proxy \
+  # harbourbridge \
+  # hidden
+  # kustomize \
+  # minikube \
+  # nomos \
+  # pkg \
+  # pubsub-emulator \
+  # terraform-validator \
+  # tests \
 
 if [[ -f '/tmp/properties' ]]; then
   info "Restore google-cloud-sdk/properties"
