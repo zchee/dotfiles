@@ -5,21 +5,31 @@ BIN="${0##*-}"
 
 info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
 
-info "Current $BIN version:
-$($BIN --version)"
+info "Current ${BIN} version:
+$(${BIN} --version)"
 
 SHELLCHECK_PATH="${SHELLCHECK_PATH:-/opt/local/bin/shellcheck}"
 
 OS=$(uname | tr '[:upper:]' '[:lower:]')
-ARCH='x86_64'
-REPO='koalaman/shellcheck'
+ARCH=$(uname -m)
+DIR=
+case "$ARCH" in
+  x86_64)
+    DIR="${OS}.${ARCH}"
+    ;;
+  arm64)
+    DIR="${OS}.aarch64"
+    ;;
+esac
 
-info "Download latest $BIN ..."
+info "Download latest ${BIN} ..."
 TMP_DIR="$(mktemp -d)"
 pushd "$TMP_DIR" > /dev/null 2>&1
-curl -sSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/${REPO}/actions/artifacts/$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/${REPO}/actions/artifacts?per_page=3" | jq '.artifacts[2].id')/zip" | jar -xvf /dev/stdin > /dev/null 2>&1
-mv -f "${OS}.${ARCH}/$BIN" "$SHELLCHECK_PATH"
-chmod +x "$SHELLCHECK_PATH"
+curl -SL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/koalaman/shellcheck/actions/artifacts?per_page=3" | jq -r '.artifacts[2].archive_download_url')" | /usr/bin/jar -xvf /dev/stdin > /dev/null 2>&1
+mv -f "${DIR}/${BIN}" "${SHELLCHECK_PATH}"
+chmod +x "${SHELLCHECK_PATH}"
+popd
+rm -rf "${TMP_DIR}"
 
-info "Updated $BIN commit: $(curl -sSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/${REPO}/commits/master" | jq -r '.sha' | cut -c -12): version:
-$($BIN --version)"
+info "Updated ${BIN} commit: $(curl -sSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/koalaman/shellcheck/commits/master" | jq -r '.sha' | cut -c -12): version:
+$(${BIN} --version)"
