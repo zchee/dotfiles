@@ -1,0 +1,13 @@
+# wrapper of `nvim` command
+
+if [ $# -ge 1 ]; then
+  ARG=("$@")
+  if echo "$ARG" | grep ':' > /dev/null; then
+    ARG=($(echo $ARG | awk -F':' '{print $1,"+"$2}'))
+  fi
+  nvim -O $ARG[@]
+else
+  nvim -O "$@"
+fi
+
+# vim:ft=zsh

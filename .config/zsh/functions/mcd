@@ -1,0 +1,6 @@
+# ----------------------------------------------------------------------------
+# mcd: makes a directory and changes to it.
+
+[[ -n "$1" ]] && mkdir -p "$1" && builtin cd "$1"
+
+# vim:ft=zsh

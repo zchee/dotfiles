@@ -1,0 +1,36 @@
+# ----------------------------------------------------------------------------
+# ex
+# compile zwc and restart Zsh
+
+{
+  autoload -Uz compdef complete compinit
+  zcompdump="${XDG_CACHE_HOME:-$HOME/.cache}/zcompdump"
+
+  rm -f "$zcompdump/.zcompdump"
+  compinit -u -C -d "$zcompdump/.zcompdump"
+
+  # # Compile the completion dump to increase startup speed.
+  # if [[ -s "$zcompdump" && (! -s "${zcompdump}.zwc" || "$zcompdump" -nt "${zcompdump}.zwc") ]]; then
+  #   zcompile "$zcompdump"
+  # fi
+} &!
+
+# Remove old .zcompdump
+# command rm -f "$HOME/.zcompdump" "$HOME/.zcompdump.zwc"
+
+# load compinit and zrecompile, and generate .zcompdump
+# autoload -Uz compinit zcompdump zrecompile
+# autoload -Uz compinit
+# compinit -u -C -d "$HOME/.zcompdump"
+
+# for f in $(print -l ${HOME}/.zshenv ${HOME}/.zshrc ${HOME}/.zcompdump ${XDG_CONFIG_HOME}/zsh/*.zsh ${XDG_CONFIG_HOME}/zsh/modules/*.zsh); do
+#   if [[ $f -nt $f.zwc ]]; then
+#     zrecompile -p -z $f
+#     command rm -f $f.zwc.old
+#   elif [[ ! -s $f.zwc ]]; then
+#     zcompile -z $f
+#   fi
+# done
+
+# restart zsh
+exec $SHELL || true

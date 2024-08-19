@@ -1,0 +1,20 @@
+# -----------------------------------------------------------------------------
+# wrapper function of edit compdef file
+
+if [[ $# -ge 1 ]]; then
+  COMPDEF_FILE=$(find ${fpath%/} -follow -name "_$1" | uniq | head -1)
+
+  if [[ -n "$COMPDEF_FILE" ]]; then
+    $EDITOR $COMPDEF_FILE
+    rm -f ${HOME}/.zcompdump
+    unfunction "$(basename $COMPDEF_FILE)"
+    autoload -Uz "$(basename $COMPDEF_FILE)"; compinit -u -C -d "$HOME/.zcompdump"
+    print -z "$1"
+  else
+    false
+  fi
+else
+  false
+fi
+
+# vim:ft=zsh

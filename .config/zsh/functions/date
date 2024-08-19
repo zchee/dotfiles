@@ -1,0 +1,10 @@
+# -----------------------------------------------------------------------------
+# set default date command output
+ 
+if ! [[ "$1" ]]; then
+  command date "+%F-%X"
+else
+  command date "$@"
+fi
+
+# vim:ft=zsh

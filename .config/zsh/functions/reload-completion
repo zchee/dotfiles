@@ -1,0 +1,22 @@
+# ----------------------------------------------------------------------------
+# Reload the zsh tab completion
+
+if [[ -n "$1" ]]; then
+  rm -f "$HOME/.zcompdump"
+
+  CMD_NAME="$1"
+  if [[ "$CMD_NAME" != _* ]]; then
+    CMD_NAME="_$CMD_NAME"
+  fi
+
+  echo "Reload ${CMD_NAME:1} completion"
+  unfunction "$CMD_NAME"; autoload -Uz "$CMD_NAME"
+
+  # -i:
+  compinit -i -D -d "$HOME/.zcompdump"
+  # compinit -u -C -d "$HOME/.zcompdump"
+else
+  echo 'The first arg is must specify complete function name'
+fi
+
+# vim:ft=zsh

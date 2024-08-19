@@ -1,0 +1,10 @@
+# -----------------------------------------------------------------------------
+# back to before directory alias
+ 
+if ! [[ "$1" ]]; then
+  builtin cd -
+else
+  builtin cd "$@"
+fi
+
+# vim:ft=zsh

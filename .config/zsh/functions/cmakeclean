@@ -1,0 +1,21 @@
+# -----------------------------------------------------------------------------
+# set default cmake generator
+
+if hash greadlink > /dev/null 2>&1; then
+  CURRENT=$(greadlink -f .)
+else
+  CURRENT=$(readlink -f .)
+fi
+
+if [[ $CURRENT == *build* ]]; then
+  pushd ../ > /dev/null 2>&1
+  rm -rf $CURRENT
+  mkdir -p $CURRENT
+  pushd $CURRENT > /dev/null 2>&1
+
+  unset CURRENT
+else
+  echo "error: Current directory name must be [build] keyword."
+fi
+
+# vim:ft=zsh

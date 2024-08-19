@@ -1,0 +1,25 @@
+# ----------------------------------------------------------------------------
+# find compdef file in $fpath
+
+info() { printf "\x1b[1;34m[INFO]\x1b[0m %s\\n" "$1" >&2; }
+
+COMPDEF_FILE="$(find ${fpath%/} -follow -name "_$1" | uniq)"
+if [[ -z "$COMPDEF_FILE" ]]; then
+  return 1
+fi
+
+if [[ $# -eq 1 ]]; then
+  echo "$COMPDEF_FILE"
+  return 0
+elif [[ $# -eq 2 ]] && [[ $2 == '-e' ]]; then
+  # edit completion file
+  $EDITOR $(echo "$COMPDEF_FILE" | uniq | head -1)
+
+  # regenerate zcompdump
+  info 'regenerate zcompdump ...'
+  rm -f ${HOME}/.zcompdump
+  unfunction "$(basename $COMPDEF_FILE)"
+  autoload -Uz "$(basename $COMPDEF_FILE)"; compinit -u -C -d "$HOME/.zcompdump"
+fi
+
+# vim:ft=zsh
