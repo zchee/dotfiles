@@ -1,9 +1,7 @@
 # dotfiles project gitattributes file
-#  https://github.com/github/linguist#using-gitattributes
-#  https://github.com/github/linguist/blob/master/lib/linguist/languages.yml
+#  https://github.com/github-linguist/linguist/blob/master/docs/overrides.md
 
 # To prevent CRLF breakages on Windows for fragile files, like testdata.
 * -text
 
 docs                                 linguist-documentation
-.config/zsh/prompt/prompt_pure_setup linguist-language=Shell
