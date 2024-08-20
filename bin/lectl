@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# Copied and edit from: https://github.com/sahsanu/lectl/blob/v0.17/lectl
+# Copied and edit from: https://github.com/sahsanu/lectl/blob/v0.22.1/lectl
 
 # ---------------------------------------------------------------------------
 # lectl
 # Script to check issued certificates by Let's Encrypt in
 # CTL (Certificate Transparency Log) using https://crt.sh
 #
-# Note: crt.sh is property of COMODO CA Limited 2015-2017
+# Note: crt.sh is property of Sectigo Limited 2015-2020
 
 # Author: sahsanu
 
@@ -101,9 +101,15 @@
 # 2018-Apr-16: Enhanced, added options [-p|--pre] and [-f|--final] to show only Pre certificates or to show only Final certificates. If no option, script will show both types of certificates. The rate limits using -f option could not be accurate due this type of cert takes too long to be logged. Rate limits using --pre option or none are counted using only the logged pre certs (v0.15)
 # 2018-Aug-05: Fix, Let's Encrypt has raised the rate limit to issue certificates for a domain in 7 days from 20 to 50,so I've updated it too (v0.16).
 # 2018-Aug-23: Enhanced, grep pattern modified to allow searches using wildcard subdomains *.domain.tld. Keep in mind that using *.domain.tld searches literally for *.domain.tld and in this case * doesn't act as a wildcard. Thanks to @travisjeffery for requesting it and provide a pull a request (v0.17)
+# 2020-Jan-24: Fix, crt.sh has been moved to new servers and has changed how the html is presented so lectl was not able to get the right info and was not working at all. This has been fixed in this release, we'll see how long lasts (v0.18)
+# 2020-Jan-25: Fix, some commands were not used as variables (v0.19)
+# 2020-Feb-01: Fix, even if there are no certificates for a domain, lectl returns 1 certificate because the wc -l command also counts blank lines (v0.20)
+# 2020-Aug-09: Enhanced, added column KEY ALG to show the Key Algorithm used in certificate. Examples; RSA 2048bit, ECC 256bit, etc. (v0.21)
+# 2023-Jul-24: Update rate limited error message. Add more checks for required utility tools. (v0.22)
+# 2023-Jul-26: Fix quotes on scriptname variable. (v0.22.1)
 # TODO:
 # Clean up and comment the code
-# Create auto-update version (comming soon)
+# Create auto-update version (comming...some day...or not)
 
 #Variables for utilities
 _date=date
@@ -125,9 +131,9 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 # Script version/name variables
-version='0.17'
-scriptname='lectl'
-lastmodification='2018-August-23'
+version='0.22.1'
+scriptname="${BASH_SOURCE[0]}"
+lastmodification='2023-July-26'
 checknewversion=1
 forceupgrade=0
 maxnumberofcerts=100
@@ -152,7 +158,7 @@ _checkcommands() {
   done
 }
 
-_checkcommands "$_curl $_awk $_grep $_sed $_cat $_date $_sort $_column $_tail"
+_checkcommands "$_curl $_awk $_grep $_sed $_cat $_date $_sort $_column $_tail ${_tr} ${_wc}"
 
 _checknewversion() {
   if [ $checknewversion = 1 ]; then
@@ -197,7 +203,7 @@ _checkerror() {
 
 # No comment[s]
 _plural() {
-  if [ "$1" -eq "1" ] || [ "$1" -eq "-1" ]; then
+  if [ "${1}" -eq "1" ] || [ "${1}" -eq "-1" ]; then
     printf ''
   else
     printf 's'
@@ -379,18 +385,19 @@ for caid in ${caidsle}; do
   $_curl -sSk "https://crt.sh/?Identity=${domain}&iCAID=${caid}${expired}${numberofcerts}" >>"${tempfile}" 2>/dev/null
   _checkerror "Failed to retrieve https://crt.sh/?Identity=${domain}&iCAID=${caid}${expired}${numberofcerts}"
 
-  $_curl -sSk "https://crt.sh/?Identity=%.${domain}&iCAID=${caid}${expired}${numberofcerts}" >>"${tempfile}" 2>/dev/null
-  _checkerror "Failed to retrieve https://crt.sh/?Identity=%.${domain}&iCAID=${caid}${expired}${numberofcerts}"
+  # Wildcard % is used by default so no need to perform 2 queries
+  #    $_curl -sSk "https://crt.sh/?Identity=%.${domain}&iCAID=${caid}${expired}${numberofcerts}" >> "${tempfile}" 2>/dev/null
+  #    _checkerror "Failed to retrieve https://crt.sh/?Identity=%.${domain}&iCAID=${caid}${expired}${numberofcerts}"
 done
 
 # Put certificates found in variable
 certsfound=$($_grep -A3 '?id=' "${tempfile}" | $_sed ':a;N;$!ba;s/>\n//g' | $_tr -d ' ')
 
 # Sorting output and removing duplicates so last cert is the first in the list
-certsfound=$(echo "$certsfound" | $_sed 's/^.*id=//' | $_sort -run | $_sed 's/^/<TD><Ahref="?id=/')
+certsfound=$(echo "$certsfound" | $_sed 's/^.*id=//' | $_sort -run)
 
 # Count certificates
-numberofcerts=$(echo "${certsfound}" | $_grep '>CN=' | $_wc -l)
+numberofcerts=$(echo "${certsfound}" | grep -cv '^\s*$')
 numberofcerts=$(echo "${numberofcerts}" | $_tr -d ' ')
 
 if [ "${numberofcerts}" -le 0 ]; then
@@ -404,13 +411,17 @@ numberfinalcerts=0
 numberprecerts=0
 
 for i in $(echo "${certsfound}"); do
-  id=$(echo "$i" | $_awk -F'id=|>|"' '{print $4}')
-  domainid=$(echo "$i" | $_awk -F'CN=|>|<' '{print $17}')
+  id=$(echo "$i" | $_awk -F'"' '{print $1}')
 
   $_curl -sS "${crturldomainid}${id}" >"${tempfile}.${id}" 2>/dev/null
   _checkerror "Failed to retrieve ${crturldomainid}${id}"
 
-  certtype="$(grep -A1 '>Summary<' "${tempfile}.${id}" | grep 'Precertificate' 1>/dev/null 2>&1)"
+  algorithm=$($_sed 's/&nbsp;//g' "${tempfile}.${id}" | $_sed 's/<BR>/\n/g' | $_grep PublicKeyAlgorithm | $_grep rsa &>/dev/null && echo RSA || echo ECC)
+  publickey=$($_sed 's/&nbsp;//g' "${tempfile}.${id}" | $_sed 's/<BR>/\n/g' | $_grep 'Public-Key:' | $_awk -F':' '{print $2}' | $_tr -d '()')
+  keyalgorithm="$algorithm $publickey"
+
+  domainid=$($_sed 's/&nbsp;//g' "${tempfile}.${id}" | $_sed 's/<BR>/\n/g' | $_grep -i commonName | $_tail -n1 | $_awk -F'=' '{print $2}')
+  certtype="$($_grep -A1 '>Summary<' "${tempfile}.${id}" | $_grep 'Precertificate' 1>/dev/null 2>&1)"
   if [ $? -eq 0 ]; then
     certtype="Pre cert"
     numberprecerts=$((numberprecerts + 1))
@@ -434,12 +445,12 @@ for i in $(echo "${certsfound}"); do
   expiresin="${expiresin} day$(_plural ${expiresin})"
 
   if [ "${showsans}" -eq "1" ]; then
-    SANS=$($_sed 's/DNS:/\r\nDNS:/g' "${tempfile}.${id}" | $_awk -F'<BR>' '/^DNS:/ {print $1}' | $_sed 's/DNS:/ ; ; ; ; ; ;/g' | $_sed ':a;N;$!ba;s/\n/\\n/g' | $_sed 's/ ; ; ; ; ; ;//')
-    partialresult=$(printf "%s;%s;%s;%s;%s;%s;%s" "$id" "$certtype" "$domainid" "$validfrom" "$validto" "$expiresin" "$SANS")
-    result="${result}\n${partialresult}${extraline}; ; ; ; ; ;\n"
+    SANS=$($_sed 's/DNS:/\r\nDNS:/g' "${tempfile}.${id}" | $_awk -F'<BR>' '/^DNS:/ {print $1}' | $_sed 's/DNS:/ ; ; ; ; ; ; ;/g' | $_sed ':a;N;$!ba;s/\n/\\n/g' | $_sed 's/ ; ; ; ; ; ; ;//')
+    partialresult=$(printf "%s;%s;%s;%s;%s;%s;%s;%s" "$id" "$certtype" "$domainid" "$keyalgorithm" "$validfrom" "$validto" "$expiresin" "$SANS")
+    result="${result}\n${partialresult}${extraline}; ; ; ; ; ; ;\n"
   else
-    partialresult=$(printf "%s;%s;%s;%s;%s;%s" "$id" "$certtype" "$domainid" "$validfrom" "$validto" "$expiresin")
-    result="${result}\n${partialresult}${extraline}; ; ; ; ;\n"
+    partialresult=$(printf "%s;%s;%s;%s;%s;%s;%s" "$id" "$certtype" "$domainid" "$keyalgorithm" "$validfrom" "$validto" "$expiresin")
+    result="${result}\n${partialresult}${extraline}; ; ; ; ; ;\n"
   fi
 done
 
@@ -447,12 +458,12 @@ finalresult=$result
 
 echo "I have found ${numberofcerts} ${nonexpired}certificate$(_plural $numberofcerts) ($numberfinalcerts final cert$(_plural $numberfinalcerts) and $numberprecerts pre cert$(_plural $numberprecerts)) (max number of certs searched: ${maxnumberofcerts}) for domain ${domain} and its subdomains *.${domain}"
 printf '\n'
-echo -e "CRT ID;CERT TYPE;DOMAIN (CN);VALID FROM;VALID TO;EXPIRES IN${columnsans}\n${finalresult}" | $_column -t -s ';'
+echo -e "CRT ID;CERT TYPE;DOMAIN (CN);KEY ALG;VALID FROM;VALID TO;EXPIRES IN${columnsans}\n${finalresult}" | $_column -t -s ';'
 
 count=0
 finalresult=$(echo "${finalresult}" | $_sed 's/\\n\\n/TRISCADEICADELICA/g' | $_sed 's/\\n//g' | $_sed 's/TRISCADEICADELICA/\n/g' | $_tr ' ' '_')
 
-for i in $(echo "${finalresult}" | grep -iv "$rate_limit_type" | $_awk -F';' '{print $4}'); do
+for i in $(echo "${finalresult}" | $_grep -iv "$rate_limit_type" | $_awk -F';' '{print $5}'); do
   rightnow=$($_date ${utc} +'%s')
   i=$(echo "$i" | $_tr '_' ' ')
   converteddate=$(echo "$i" | $_awk -F'-| ' '{print $2,$3,$4,$5,$1}')
@@ -476,7 +487,8 @@ if [ $maxnumberofcerts -ge $ratelimit ]; then
     echo "You could issue next certificate on $next"
     printf '\n'
     echo "Note 1: Keep in mind that if ${domain} is included in PSL (Public Suffix List) the rate limit could only be applied to your subdomain instead of your domain."
-    echo "Note 2: Right now Let's Encrypt is implementing a new feature so if you renew the exact cert (with the same FQDNs) the rate limit could not apply to your domain if you try to renew it."
+    echo "Note 2: If you requested a rate limit adjustment for your domain or ACME account ID via https://letsencrypt.org/docs/rate-limits/ that change is not reflected here."
+    echo "Note 3: Let's Encrypt has a renewal exemption for the certificates/registered domain/week rate limit. More information can be found at: https://letsencrypt.org/docs/rate-limits/"
     printf '\n'
   else
     if [ -z "${extraline}" ]; then echo " "; fi
