@@ -4,40 +4,28 @@ set -euo pipefail
 BIN="${0##*-}"
 
 info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
-warn() { printf "\\x1b[1;33m[WARN]\\x1b[0m %s\\n\\n" "$1"; }
 
 KUBECTL_PATH='/opt/local/bin/kubectl'
 if [ -f "$KUBECTL_PATH" ]; then
-  info "Current $BIN version: $($KUBECTL_PATH version --client)"
+  info "Current $BIN version: $($KUBECTL_PATH version --client -o yaml)"
 fi
 
-KUBECTL_VERSION="$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)"
-if [[ $# -eq 1 ]] && [[ $1 == 'latest' ]]; then
-  KUBECTL_VERSION="$(curl -s https://storage.googleapis.com/kubernetes-release/release/latest.txt)"
+KUBECTL_VERSION="$(curl -s https://storage.googleapis.com/kubernetes-release/release/latest.txt)"
+if [[ $# -eq 1 ]] && [[ $1 == 'stable' ]]; then
+  KUBECTL_VERSION="$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)"
 fi
 
 OS=$(uname | tr '[:upper:]' '[:lower:]')
 ARCH=''
 case $(uname -m) in
-  i386)   ARCH="386" ;;
-  i686)   ARCH="386" ;;
-  x86_64) ARCH="amd64" ;;
-  arm)    dpkg --print-architecture | grep -q "arm64" && ARCH="arm64" || ARCH="arm" ;;
+i386) ARCH="386" ;;
+i686) ARCH="386" ;;
+x86_64) ARCH="amd64" ;;
+arm) dpkg --print-architecture | grep -q "arm64" && ARCH="arm64" || ARCH="arm" ;;
 esac
 
 info "Download $BIN $KUBECTL_VERSION..."
-curl -o "$KUBECTL_PATH" -SL "https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/$OS/$ARCH/kubectl"
+curl -o "$KUBECTL_PATH" -sSL "https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/$OS/$ARCH/kubectl" # use https://www.downloadkubernetes.com/ ?
 chmod +x "$KUBECTL_PATH"
 
-info "Generate $BIN completion..."
-if [[ $SHELL = *"zsh"* ]]; then
-  rm -f "$XDG_CONFIG_HOME/zsh/completions/_$BIN"
-  $BIN completion zsh | tee "$XDG_CONFIG_HOME/zsh/completions/_$BIN" > /dev/null
-elif [[ "$SHELL" = *"bash"* ]]; then
-  rm -f "/etc/bash_completion.d/$BIN"
-  $BIN completion bash | tee "/etc/bash_completion.d/$BIN" > /dev/null
-else
-  warn 'Not supported shell'
-fi
-
-info "Updated $BIN version: $($BIN version --client)"
+info "Updated $BIN version: $($BIN version --client -o yaml)"
