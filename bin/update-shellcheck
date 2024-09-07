@@ -10,26 +10,16 @@ $(${BIN} --version)"
 
 SHELLCHECK_PATH="${SHELLCHECK_PATH:-/opt/local/bin/shellcheck}"
 
-OS=$(uname | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-DIR=
-case "$ARCH" in
-  x86_64)
-    DIR="${OS}.${ARCH}"
-    ;;
-  arm64)
-    DIR="${OS}.aarch64"
-    ;;
-esac
+distro=$(uname -sm | tr ' ' '.' | tr '[:upper:]' '[:lower:]')
 
 info "Download latest ${BIN} ..."
 TMP_DIR="$(mktemp -d)"
-pushd "$TMP_DIR" > /dev/null 2>&1
-curl -SL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/koalaman/shellcheck/actions/artifacts?per_page=3" | jq -r '.artifacts[2].archive_download_url')" | /usr/bin/jar -xvf /dev/stdin > /dev/null 2>&1
-mv -f "${DIR}/${BIN}" "${SHELLCHECK_PATH}"
+pushd "$TMP_DIR" >/dev/null 2>&1
+repo='koalaman/shellcheck'
+gh -R ${repo} run download $(gh -R ${repo} run list -L 1 -b master -w build.yml --json databaseId --jq '.[].databaseId') -p "${distro}.bin"
+mv -f "${distro}.bin/${distro}/${BIN}" "${SHELLCHECK_PATH}"
 chmod +x "${SHELLCHECK_PATH}"
-popd
+popd >/dev/null 2>&1
 rm -rf "${TMP_DIR}"
 
-info "Updated ${BIN} commit: $(curl -sSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/koalaman/shellcheck/commits/master" | jq -r '.sha' | cut -c -12): version:
-$(${BIN} --version)"
+info "Updated ${BIN}: $(${BIN} --version)"
