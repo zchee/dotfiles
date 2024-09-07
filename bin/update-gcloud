@@ -1,39 +1,48 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 BIN="${0##*-}"
 
 info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
-error() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; exit 1; }
+error() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1" >&2; }
 
-[[ ! $# -eq 1 ]] && { echo "[ERROR] Usage: $BIN [VERSION]"; exit 1; }
+[[ ! $# -eq 1 ]] && {
+  echo "[ERROR] Usage: $BIN [VERSION]"
+  exit 1
+}
 VERSION=$1
 
 OS=$(uname | tr '[:upper:]' '[:lower:]')
 
-_restore_sdk() {
-  cp -r /tmp/google-cloud-sdk "$CLOUDSDK_ROOT_DIR"
-  rm -rf /tmp/google-cloud-sdk
+_restore_properties() {
+  if [[ -f '/tmp/properties' ]]; then
+    info "Restore google-cloud-sdk/properties ..."
+    cp /tmp/properties "${CLOUDSDK_ROOT_DIR}"
+  fi
 }
 
 # Take care of signals
 _trap_exit() { # Handle trapped signals
+  _restore_sdk() {
+    cp -r /tmp/google-cloud-sdk "$CLOUDSDK_ROOT_DIR"
+    rm -rf /tmp/google-cloud-sdk
+  }
+
   case $1 in
-    INT)
-      error "interrupted by user"
-      _restore_sdk
-      exit 100
-      ;;
-    TERM)
-      error "terminated"
-      _restore_sdk
-      exit 101
-      ;;
-    *)
-      error "Terminating on unknown signal"
-      _restore_sdk
-      exit 102
-      ;;
+  INT)
+    error "interrupted by user"
+    _restore_sdk
+    exit 100
+    ;;
+  TERM)
+    error "terminated"
+    _restore_sdk
+    exit 101
+    ;;
+  *)
+    error "Terminating on unknown signal"
+    _restore_sdk
+    exit 102
+    ;;
   esac
 }
 
@@ -51,13 +60,13 @@ fi
 
 install_path=
 case $(uname -m) in
-  x86_64)
-    install_path='/usr/local'
-    ;;
+x86_64)
+  install_path='/usr/local'
+  ;;
 
-  arm64)
-    install_path='/opt/local'
-    ;;
+arm64)
+  install_path='/opt/local'
+  ;;
 esac
 
 info "Install google-cloud-sdk $VERSION for $OS..."
@@ -77,6 +86,7 @@ info "Install gcloud components..."
   gcloud-man-pages \
   gke-gcloud-auth-plugin \
   gsutil \
+  istioctl \
   kpt \
   kubectl \
   kubectl-oidc \
@@ -87,36 +97,33 @@ info "Install gcloud components..."
   skaffold \
   terraform-tools
 
-  # anthos-auth  \
-  # app-engine-go \
-  # app-engine-grpc \
-  # app-engine-java \
-  # app-engine-php \
-  # app-engine-python \
-  # app-engine-python-extras \
-  # appctl \
-  # bigtable \
-  # cbt  \
-  # cloud-datastore-emulator  \
-  # cloud-firestore-emulator \
-  # cloud_sql_proxy \
-  # dataflow-sql \
-  # datalab \
-  # emulator-reverse-proxy \
-  # harbourbridge \
-  # hidden
-  # kustomize \
-  # minikube \
-  # nomos \
-  # pkg \
-  # pubsub-emulator \
-  # terraform-validator \
-  # tests \
+# anthos-auth  \
+# app-engine-go \
+# app-engine-grpc \
+# app-engine-java \
+# app-engine-php \
+# app-engine-python \
+# app-engine-python-extras \
+# appctl \
+# bigtable \
+# cbt  \
+# cloud-datastore-emulator  \
+# cloud-firestore-emulator \
+# cloud_sql_proxy \
+# dataflow-sql \
+# datalab \
+# emulator-reverse-proxy \
+# harbourbridge \
+# hidden
+# kustomize \
+# minikube \
+# nomos \
+# pkg \
+# pubsub-emulator \
+# terraform-validator \
+# tests \
 
-if [[ -f '/tmp/properties' ]]; then
-  info "Restore google-cloud-sdk/properties"
-  cp /tmp/properties "$CLOUDSDK_ROOT_DIR"
-fi
+_restore_properties
 
 rm -rf /tmp/google-cloud-sdk
 
