@@ -3,10 +3,16 @@ set -euo pipefail
 
 # display current directory's GOPATH
 
-error() { printf "\x1b[1;31m[ERROR]\x1b[0m %s\\n" "$1" >&2; exit 1; }
+error() {
+  printf "\\x1b[1;31m[ERROR]\\x1b[0m %s\\n" "$1" >&2
+  exit 1
+}
 
 GO_PATH="$(go env GOPATH)"
 PACKAGE=$(echo "${PWD/#$HOME/'~'}" | awk -F"${GO_PATH/#$HOME/'~'}/src/" '{print $2}')
+if [ -f "${PACKAGE}/go.mod" ]; then
+  PACKAGE="$(echo "${PACKAGE}" | awk -F$(cat $(go env GOMOD) | grep 'module ' | awk -F"${PACKAGE}" '{print $2}'))"
+fi
 
 if [ -z "$PACKAGE" ]; then
   error "not in \$GOPATH"
