@@ -28,4 +28,15 @@ info "Download $BIN $KUBECTL_VERSION..."
 curl -o "$KUBECTL_PATH" -sSL "https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/$OS/$ARCH/kubectl" # use https://www.downloadkubernetes.com/ ?
 chmod +x "$KUBECTL_PATH"
 
+info "Generate $BIN completion..."
+if [[ $SHELL = *"zsh"* ]]; then
+  rm -f "${XDG_CONFIG_HOME}/zsh/completions/_$BIN"
+  $BIN completion zsh | tee "${XDG_CONFIG_HOME}/zsh/completions/_$BIN" >/dev/null
+elif [[ "$SHELL" = *"bash"* ]]; then
+  rm -f "/etc/bash_completion.d/$BIN"
+  $BIN completion bash | tee "/etc/bash_completion.d/$BIN" >/dev/null
+else
+  warn 'Not supported shell'
+fi
+
 info "Updated $BIN version: $($BIN version --client -o yaml)"
