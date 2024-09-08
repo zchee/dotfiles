@@ -1,47 +1,92 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export SHELL_DEBUG=${SHELL_DEBUG:-}
+info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
+debug() { test -z "${SHELL_DEBUG}" || printf "\\x1b[1;36m[DEBUG]\\x1b[0m %s\\n\\n" "$1"; }
+
 ROOT="$PWD"
 
-GO=${GO:-$(command -v go)}
+go=${GO:-$(command -v go)}
+find="$(command -v find)"
+if ! command -v gfind >/dev/null; then
+  find="gfind -O3"
+fi
 
-export GOOS=${GOOS:-$(go env GOOS)}
-export GOARCH=${GOARCH:-$(go env GOARCH)}
+# https://superuser.com/a/218684
+if ! command -v realpath >/dev/null; then
+  realpath() {
+    pushd . >/dev/null
+    if [ -d "$1" ]; then
+      cd "$1"
+      dirs -l +0
+    else
+      cd "$(dirname "$1")"
+      cur_dir=$(dirs -l +0)
+      if [ "$cur_dir" == "/" ]; then
+        echo "$cur_dir$(basename "$1")"
+      else
+        echo "$cur_dir/$(basename "$1")"
+      fi
+    fi
+    popd >/dev/null
+  }
+fi
+
+export GOOS=${GOOS:-$(${go} env GOOS)}
+export GOARCH=${GOARCH:-$(${go} env GOARCH)}
 export GOFLAGS=${GOFLAGS:-}
 export CGO_CFLAGS=${CGO_CFLAGS:-}
 export CGO_LDFLAGS=${CGO_LDFLAGS:-}
-GOBIN=$(mktemp -d); export GOBIN
 export GOEXPERIMENT=${GOEXPERIMENT:-}
+if [[ "$(uname -s | tr '[:upper:]' '[:lower:]')" == "${GOOS}" ]]; then
+  GOBIN=$(mktemp -d)
+  export GOBIN
+fi
 
-filter='{{ if and (or .GoFiles .CgoFiles) (ne .Name "main") }}{{ .ImportPath }}{{ end }}'
+filter='{{ if and ( ne .Name "main" ) ( or .GoFiles .CgoFiles .TestGoFiles .XTestGoFiles ) }}{{ .ImportPath }}{{ end }}'
 readonly filter
 
 trap INT ABRT TERM
 
-for gomod in $(find -O3 . -type f -name 'go.mod' -not -iwholename '*vendor*' -not -iwholename '*not*' -not -iwholename '*testdata*' -not -iwholename '*test*' -not -iwholename '*example*' -not -iwholename './tools/go.mod' -not -iwholename '*/_*');
-do
+gomods=
+if command -v fd >/dev/null; then
+  gomods="$(fd go.mod -t f -j $(getconf _NPROCESSORS_ONLN) -E 'vendor/' -E 'test*/' -E 'example' -E 'examples' -E 'third_party/' -E 'tools/' -E 'cmd/' -E '_*' -E 'integration/' | tr '\n' ' ')"
+else
+  find="$(command -v find)"
+  if ! command -v gfind >/dev/null; then
+    find="gfind -O3"
+  fi
+  gomods="$($find . -type f -name 'go.mod' -not -iwholename '*vendor*' -not -iwholename '*not*' -not -iwholename '*testdata*' -not -iwholename '*test*' -not -iwholename '*example*' -not -iwholename '*examples*' -not -iwholename '*third_party*' -not -iwholename '*tools/go.mod*' -not -iwholename '*/_*' -not -iwholename '*integration/go.mod*')"
+fi
+
+for gomod in ${gomods}; do
   MODROOT="$(realpath $(dirname "$gomod"))"
+  if [[ ! -d ${MODROOT} ]]; then
+    MODROOT="$(realpath .)"
+  fi
+  debug "MODROOT: ${MODROOT}"
 
-  pushd "${MODROOT}" > /dev/null 2>&1
+  pushd "${MODROOT}" >/dev/null 2>&1
 
-  if [[ "${MODROOT}" != '/usr/local/go'* ]]; then
-    ${GO} mod vendor
+  (${go} work sync && ${go} work vendor) >/dev/null 2>&1 || ${go} mod vendor
+  mod_mode='vendor'
+  if [[ -n "$($go env GOWORK)" ]]; then
+    mod_mode='readonly'
   fi
 
-  PKGS="$(${GO} list -mod=readonly -f="${filter}" ./... | grep -v -e 'third_party' | tr '\n' ' ')"
-  # echo "PKGS: ${PKGS}"  # debug
-  eval "${GO} install -mod=readonly -v -x ${PKGS}"
+  debug "run $${go} list -mod=$mod_mode -f=${filter} ./... | tr '\n' ' ') for \$PACKAGES variable"
+  PACKAGES="$(${go} list -e -mod=$mod_mode -f="${filter}" ./... | tr '\n' ' ')"
+  debug "PACKAGES: ${PACKAGES}"
 
-  modmode='vendor'
-  if [[ -n "$(go env GOWORK)" ]]; then
-     modmode='readonly'
-  fi
+  debug "run eval ${go} install -mod=$mod_mode ${PACKAGES}"
+  eval "${go} install -v -x -mod=$mod_mode ${PACKAGES}" || true
 
   if [[ -d "$(dirname "$gomod")/vendor" ]]; then
-    VENDOR_PKGS="$(${GO} list -mod=${modmode} -f="$filter" "$MODROOT"/vendor/... | tr '\n' ' ' || true)"
-    eval "${GO} install -mod=readonly -v -x $VENDOR_PKGS" || true
-    # echo "VENDOR_PKGS: $VENDOR_PKGS"  # debug
+    GOWORK_VENDOR_PACKAGES="$(${go} list -e -mod=$mod_mode -f="$filter" "${MODROOT}"/vendor/... | tr '\n' ' ' || true)"
+    eval "${go} install -v -x -mod=$mod_mode ${GOWORK_VENDOR_PACKAGES}" || true
+    debug "GOWORK_VENDOR_PACKAGES: ${GOWORK_VENDOR_PACKAGES}"
   fi
 
-  pushd "${ROOT}" > /dev/null 2>&1
+  pushd "${ROOT}" >/dev/null
 done
