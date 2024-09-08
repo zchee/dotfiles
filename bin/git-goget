@@ -3,21 +3,23 @@ set -euo pipefail
 
 error() { printf "\x1b[1;31m[ERROR]\x1b[0m %s\\n" "$1" >&2; exit 1; }
 
-[[ ! $# -eq 1 ]] && error "Usage: ${0##*/} <package import path>"
+[[ $# -lt 1 ]] && error "Usage: ${0##*/} <module path>"
 
-clone_path="${1#https://}"
-readonly clone_path
-import_path="${clone_path#github.com/}"
-readonly import_path
-gopath=$(go env GOPATH)
-readonly gopath
+for p in "$@";
+do
+  echo "Fetch ${p}"
+  gopath=$(go env GOPATH)
+  url="https://${p}"
+  clone_path="${url#https://}"
 
-if [[ ! -d "${gopath}/src/$clone_path" ]]; then
-  mkdir -p "${gopath}/src/$(dirname "$clone_path")"
-  if ! git clone "https://github.com/$import_path.git" "${gopath}/src/$clone_path" 2> /dev/null; then
-    url=$(curl -siL "https://$clone_path?go-get=1" | grep go-import -C 3 | grep 'git https://' | sed -E "s|git (https://.*)['\"]>|\1|" | awk -F'https' '{print "https"$2}' | cut --delimiter='"' -f1)
-    git clone "${url}" "${gopath}/src/$clone_path"
+  if [[ ! -d "${gopath}/src/${clone_path}" ]]; then
+    url="$(curl -sSL "${url}?go-get=1" | pup 'meta[name="go-import"] attr{content}' | cut -d ' ' -f 3)"
+
+    mkdir -p "${gopath}/src/$(dirname "${p}")"
+    git clone "${url}" "${gopath}/src/${p}"
+  else
+    git -C "${gopath}/src/${p}" pull --ff-only
   fi
-else
-  git -C "${gopath}/src/$clone_path" pull --ff-only
-fi
+  git -C "${gopath}/src/${p}" fetch --all --prune --auto-gc --verbose
+  git -C "${gopath}/src/${p}" fetch --tags --force --auto-gc --verbose
+done
