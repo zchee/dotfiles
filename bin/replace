@@ -8,8 +8,8 @@ shift
 REPLACE="$1"
 shift
 
-if command -v rg > /dev/null 2>&1; then
-  rg -l --no-config --no-ignore-vcs --glob='!.git' --glob='!.hg' --glob='!.svn' --glob='!vendor' --glob='!*.recording' --glob='!*.min.*' --multiline --hidden --mmap --threads=20 "$@" "$PATTERN" | xargs -P"$(getconf _NPROCESSORS_CONF)" "${SED}" -E -i "s|$PATTERN|$REPLACE|g"
+if command -v rg >/dev/null 2>&1; then
+  rg -l --no-config --no-ignore-vcs --glob='!.git' --glob='!.hg' --glob='!.svn' --glob='!vendor' --glob='!*.recording' --glob='!*.min.*' --multiline --hidden --mmap --threads=$(getconf _NPROCESSORS_CONF) "$@" "$PATTERN" | xargs -P"$(getconf _NPROCESSORS_CONF)" "${SED}" -E -i "s|$PATTERN|$REPLACE|g"
 else
   grep -rl "$1" "$PWD" | xargs -P"$(getconf _NPROCESSORS_CONF)" "${SED}" -i "s|$1|$2|g"
 fi
