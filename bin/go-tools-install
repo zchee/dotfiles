@@ -10,24 +10,25 @@ fi
 GO=${GO:-$(which go)}
 
 export CGO_ENABLED=0
-export GOCACHE="$(mktemp -d)"
+GOCACHE="$(mktemp -d)"
+export GOCACHE
 
 buildtags='osusergo,netgo,static'
 readonly buildtags
 
-BINARIES="$(go list -f='{{ if eq .Name "main" }}{{ .ImportPath }}{{ end }}' ./... | grep -v -e 'cmd/getgo/server' -e 'internal/lsp/helper' -e 'internal/stack/gostacks' | tr '\n' ' ')"
+BINARIES="$(go list -f='{{ if eq .Name "main" }}{{ .ImportPath }}{{ end }}' ./... | grep -E -v -e 'cmd/(bundle|getgo(/server)?|stress)' -e 'internal/(lsp/helper|stack/gostacks|play)' | tr '\n' ' ')"
 readonly BINARIES
 
 # Install tools binaries
-$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode external -buildid= "-extldflags=-static-pie -fPIE -mdynamic-no-pic"' ${BINARIES}
+$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode internal -buildid= "-extldflags=-static-pie"' ${BINARIES}
 
 # Install gopls
 pushd "$(go env GOPATH)/src/golang.org/x/tools/gopls" > /dev/null 2>&1
-$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode external -buildid= "-extldflags=-static-pie -fPIE -mdynamic-no-pic"' ./
+$GO install -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode internal -buildid= "-extldflags=-static-pie"' ./
 pushd "${CWD}" > /dev/null 2>&1
 
 pushd "$(go env GOPATH)/src/golang.org/x/tools/go/analysis/unitchecker" > /dev/null 2>&1
-$GO build -o "$(go env GOPATH)/bin/unitchecker" -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode external -buildid= "-extldflags=-static-pie -fPIE -mdynamic-no-pic"' main.go
+$GO build -o "$(go env GOPATH)/bin/unitchecker" -v -x -trimpath -tags=${buildtags} -ldflags='-s -w -linkmode internal -buildid= "-extldflags=-static-pie"' main.go
 pushd "${CWD}" > /dev/null 2>&1
 
 rm -f $(go env GOPATH)/bin/bundle
