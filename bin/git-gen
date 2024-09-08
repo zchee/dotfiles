@@ -32,8 +32,6 @@ if [[ "$#" -lt 2 ]]; then
   usage
 fi
 
-AUTHOR=${AUTHOR:-$(basename "$(dirname "$PWD")")/$(basename "$PWD")}
-
 ARG_LICENSE="$1"
 shift
 ARG_LANGUAGES=("$@")
@@ -44,43 +42,46 @@ AUTHOR="${AUTHOR:-$PROJECT_NAME}"
 
 declare LICENSE_TYPE
 case "$ARG_LICENSE" in
-  bsd | bsd-project)
-    LICENSE_TYPE=BSD3_PROJECT
-    ;;
-  bsd-owner)
-    LICENSE_TYPE=BSD3_OWNER
-    ;;
-  bsd-go)
-    LICENSE_TYPE=BSD3_THE_GO_AUTHORS
-    ;;
-  mit | mit-project)
-    LICENSE_TYPE=MIT_PROJECT
-    ;;
-  mit-owner)
-    LICENSE_TYPE=MIT_OWNER
-    ;;
-  apache2)
-    LICENSE_TYPE=Apache2
-    ;;
-  mercari)
-    LICENSE_TYPE=
-    ;;
-  *)
-    echo '[FATAL] unknown license type'
-    usage
-    ;;
+bsd | bsd-project)
+  LICENSE_TYPE=BSD3_PROJECT
+  LICENSE_IDENTIFIER='BSD-3-Clause'
+  ;;
+bsd-owner)
+  LICENSE_TYPE=BSD3_OWNER
+  LICENSE_IDENTIFIER='BSD-3-Clause'
+  ;;
+bsd-go)
+  LICENSE_TYPE=BSD3_THE_GO_AUTHORS
+  LICENSE_IDENTIFIER='BSD-3-Clause'
+  ;;
+mit | mit-project)
+  LICENSE_TYPE=MIT_PROJECT
+  LICENSE_IDENTIFIER='MIT'
+  ;;
+mit-owner)
+  LICENSE_TYPE=MIT_OWNER
+  LICENSE_IDENTIFIER='MIT'
+  ;;
+apache2 | Apache2)
+  LICENSE_TYPE=Apache2
+  LICENSE_IDENTIFIER='Apache-2.0'
+  ;;
+*)
+  echo '[FATAL] unknown license type'
+  usage
+  ;;
 esac
 
 # git init
 if [[ -d '.git' ]]; then
   warn '.git directory already exist'
 fi
-git init > /dev/null 2>&1
+git init --ref-format=reftable >/dev/null 2>&1
 
 # write LICENSE if not exist
 if [[ ! -f 'LICENSE' ]]; then
   if [[ -n "$LICENSE_TYPE" ]]; then
-    cat "$XDG_CONFIG_HOME/boilerplate/license/$LICENSE_TYPE" > LICENSE
+    cat "$XDG_CONFIG_HOME/boilerplate/license/$LICENSE_TYPE" >LICENSE
     if [[ "$LICENSE_TYPE" == "BSD3_PROJECT" ]] || [[ "$LICENSE_TYPE" == "MIT_PROJECT" ]]; then
       sed -i "s|AUTHOR|$AUTHOR|g" LICENSE
     fi
@@ -88,12 +89,12 @@ if [[ ! -f 'LICENSE' ]]; then
   fi
 fi
 
-pushd "$GIIGNORE_REPOSITORY" > /dev/null 2>&1
-git pull origin main > /dev/null 2>&1
-popd > /dev/null 2>&1
+pushd "$GIIGNORE_REPOSITORY" >/dev/null 2>&1
+git pull origin main >/dev/null 2>&1
+popd >/dev/null 2>&1
 
 # write .gitignore
-cat << EOF > .gitignore
+cat <<EOF >.gitignore
 # AUTHOR project generated files to ignore
 #  if you want to ignore files created by your editor/tools,
 #  please consider a global .gitignore https://help.github.com/articles/ignoring-files
@@ -102,13 +103,13 @@ EOF
 
 # write .gitattributes
 touch .gitattributes
-cat << EOF >> .gitattributes
+cat <<EOF >>.gitattributes
 # AUTHOR project gitattributes file
-#  https://github.com/github/linguist/blob/master/docs/overrides.md
+#  https://github.com/github-linguist/linguist/blob/master/docs/overrides.md
 
-* -text
+* text=auto eol=lf
 
-docs        linguist-documentation
+go.sum    linguist-generated
 EOF
 
 declare exists=false
@@ -130,26 +131,27 @@ for lang in "${ARG_LANGUAGES[@]}"; do
   fi
 
   if $exists; then
-    printf "\\n# github/gitignore/%s" "${LANGUAGE_IGNORE^}" >> .gitignore
-    printf "\\n%s\\n" "$(cat "$file")" >> .gitignore
+    printf "\\n# github/gitignore/%s" "${LANGUAGE_IGNORE^}" >>.gitignore
+    printf "\\n%s\\n" "$(cat "$file")" >>.gitignore
   fi
 
   case "$lang" in
-    go | Go | go-old | community/Golang)
+  go | Go | go-old | community/Golang)
 
     case "$lang" in
-      community/Golang)
-        sed -i 's|# But not these files...|!/.gitattributes|' .gitignore
-        sed -i 's|# !Makefile|!Makefile|' .gitignore
-        sed -i ':a;N;$!ba;s|#\n# Recommended: Go.AllowList.gitignore\n||' .gitignore
-        sed -i ':a;N;$!ba;s|# ...even if they are in subdirectories\n||' .gitignore
-        ;;
-      go | Go | go-old)
-        sed -i 's|Dependency directories (remove the comment below to include it)|Dependency directories|' .gitignore
-        sed -i 's|# vendor/|vendor/|' .gitignore
+    community/Golang)
+      gsed -i 's|# But not these files...|!/.gitattributes|' .gitignore
+      gsed -i 's|# !Makefile|!Makefile|' .gitignore
+      gsed -i ':a;N;$!ba;s|#\n# Recommended: Go.AllowList.gitignore\n||' .gitignore
+      gsed -i ':a;N;$!ba;s|# ...even if they are in subdirectories\n||' .gitignore
+      ;;
+    go | Go)
+      gsed -E -i ':a;N;$!ba;s|(# Dependency directories )\(remove the comment below to include it\)\n# (vendor/)|\1\n\2|' .gitignore
+      gsed -i ':a;N;$!ba;s|# Go workspace file\ngo.work\ngo.work.sum\n\n||' .gitignore
+      gsed -i ':a;N;$!ba;s|\n\n# env file\n.env||' .gitignore
 
-        {
-          echo "
+      {
+        echo "
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
 *.a
@@ -181,58 +183,56 @@ bench.txt
 *.pprof
 
 # coverage
-coverage.out"
-        } >> .gitignore
+coverage.out
+
+# bench
+old.txt
+new.txt"
+      } >>.gitignore
+      ;;
     esac
 
-      # write .gitattributes
-      cat << EOF >> .gitattributes
-*.pb.go     linguist-generated
-*gen.go     linguist-generated
-*_string.go linguist-generated
-EOF
+    # .github
+    cp -r "$XDG_CONFIG_HOME/boilerplate/.github" .github
+    sed -i "s|PKG|$PROJECT_NAME|g" .github/ISSUE_TEMPLATE/bug_report.yml
 
-      # .github
-      cp -r "$XDG_CONFIG_HOME/boilerplate/.github" .github
-      sed -i "s|PKG|$PROJECT_NAME|g" .github/ISSUE_TEMPLATE/bug_report.yml
+    # golangci-lint
+    cp "$XDG_CONFIG_HOME/boilerplate/go/.golangci.yaml" .
+    sed -i "s|local-prefixes: github.com/|local-prefixes: github.com/$ORGANIZATION_NAME/$PROJECT_NAME|" .golangci.yaml
+    sed -i "s|AUTHOR: AUTHOR|AUTHOR: $AUTHOR|" .golangci.yaml
 
-      sed -i "s|AUTHOR|$AUTHOR|" .gitignore .gitattributes
+    # creates hack directory
+    mkdir -p hack/boilerplate
+    cp "$XDG_CONFIG_HOME/boilerplate/go/boilerplate.go.txt" hack/boilerplate
+    sed -i "s|AUTHOR|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
+    sed -i "s|LICENSE_IDENTIFIER|$LICENSE_IDENTIFIER|g" hack/boilerplate/boilerplate.*.txt
+    sed -i "s|YEAR|$(date +%Y)|g" hack/boilerplate/boilerplate.*.txt
 
-      # golangci-lint
-      cp "$XDG_CONFIG_HOME/boilerplate/go/.golangci.yml" .
-      sed -i "s|local-prefixes: github.com/|local-prefixes: github.com/$ORGANIZATION_NAME/$PROJECT_NAME|" .golangci.yml
-      sed -i "s|AUTHOR: AUTHOR|AUTHOR: $AUTHOR|" .golangci.yml
+    # create root go.mod
+    go mod init
+    go mod edit -go=1.23 -toolchain=go1.23.0
+    touch go.sum
 
-      # creates hack directory
-      mkdir -p hack/boilerplate
-      cp "$XDG_CONFIG_HOME/boilerplate/go/boilerplate.go.txt" hack/boilerplate
-      sed -i "s|AUTHOR|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
-      sed -i "s|YEAR|$(date +%Y)|g" hack/boilerplate/boilerplate.*.txt
+    # write Makefile
+    if [[ "$lang" != "go" ]]; then
+      cp "$XDG_CONFIG_HOME/boilerplate/go/Makefile" Makefile
+    fi
+    ;;
 
-      # create root go.mod
-      go mod init && go mod edit -go=1.18
-      touch go.sum
-
-      # write Makefile
-      if [[ "$lang" != "go" ]]; then
-        cp "$XDG_CONFIG_HOME/boilerplate/go/Makefile" Makefile
-      fi
-      ;;
-
-    orb)
-      NAMESPACE=$ORGANIZATION_NAME
-      if [[ $NAMESPACE == 'circleci-orb' ]]; then
-        NAMESPACE='cci-orb'
-      fi
-      sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" LICENSE
-      sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitignore
-      sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitattributes
-      mkdir -p src hack/boilerplate hack/make
-      cp "$XDG_CONFIG_HOME"/boilerplate/yaml/orb/boilerplate.*.txt hack/boilerplate/
-      cp "$XDG_CONFIG_HOME/boilerplate/yaml/orb/.yamllint" .yamllint
-      cp "$XDG_CONFIG_HOME/boilerplate/yaml/orb/orb.mk" hack/make/
-      sed -i "s|PKG|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
-      cat << EOF >> src/orb.yml
+  orb)
+    NAMESPACE=$ORGANIZATION_NAME
+    if [[ $NAMESPACE == 'circleci-orb' ]]; then
+      NAMESPACE='cci-orb'
+    fi
+    sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" LICENSE
+    sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitignore
+    sed -i "s|AUTHOR|$ORGANIZATION_NAME/$PROJECT_NAME|" .gitattributes
+    mkdir -p src hack/boilerplate hack/make
+    cp "$XDG_CONFIG_HOME"/boilerplate/yaml/orb/boilerplate.*.txt hack/boilerplate/
+    cp "$XDG_CONFIG_HOME/boilerplate/yaml/orb/.yamllint" .yamllint
+    cp "$XDG_CONFIG_HOME/boilerplate/yaml/orb/orb.mk" hack/make/
+    sed -i "s|PKG|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
+    cat <<EOF >>src/orb.yml
 
 version: 2.1
 
@@ -240,7 +240,7 @@ description: |
 
 EOF
 
-      cat << EOF >> Makefile
+    cat <<EOF >>Makefile
 # ----------------------------------------------------------------------------
 # global
 
@@ -261,39 +261,41 @@ include hack/make/orb.mk
 # overlays
 EOF
 
-      {
-        echo "
+    {
+      echo "
 # packed orb
 /src/$PROJECT_NAME.yml"
-      } >> .gitignore
-      ;;
+    } >>.gitignore
+    ;;
 
-    *)
-      mkdir -p hack/boilerplate
-      {
-        if find "$XDG_CONFIG_HOME/boilerplate/$lang" -maxdepth 1 -type f -name 'boilerplate.*.txt' > /dev/null 2>&1; then
-          cp "$XDG_CONFIG_HOME/boilerplate/$lang"/boilerplate.*.txt hack/boilerplate/
-          sed -i "s|PKG|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
-        fi
-      }
-      ;;
+  *)
+    mkdir -p hack/boilerplate
+    {
+      if find "$XDG_CONFIG_HOME/boilerplate/$lang" -maxdepth 1 -type f -name 'boilerplate.*.txt' >/dev/null 2>&1; then
+        cp "$XDG_CONFIG_HOME/boilerplate/$lang"/boilerplate.*.txt hack/boilerplate/
+        sed -i "s|PKG|$AUTHOR|g" hack/boilerplate/boilerplate.*.txt
+      fi
+    }
+    ;;
   esac
 done
 
+sed -i "s|AUTHOR|$AUTHOR|" .gitignore .gitattributes
+
 # creates README.md
 if [ ! -f 'README.md' ]; then
-  printf "# %s\\n" "$PROJECT_NAME" > README.md
+  printf "# %s\\n" "$PROJECT_NAME" >README.md
 fi
 
 # set git remote origin
-git remote add origin "git@github.com:$ORGANIZATION_NAME/$PROJECT_NAME.git" > /dev/null 2>&1 || true
+git remote add origin "git@github.com:$ORGANIZATION_NAME/$PROJECT_NAME.git" >/dev/null 2>&1 || true
 
 # git add
-[[ -f .gitignore ]]      && git add .gitignore
-[[ -f .gitattributes ]]  && git add .gitattributes
-[[ -f LICENSE ]]         && git add LICENSE
+[[ -f .gitignore ]] && git add .gitignore
+[[ -f .gitattributes ]] && git add .gitattributes
+[[ -f LICENSE ]] && git add LICENSE
 
 # git commit
-git commit -m 'Initial commit' --signoff --gpg-sign > /dev/null 2>&1
+git commit -m 'Initial commit' --signoff --gpg-sign >/dev/null 2>&1
 
 info "Generated $PROJECT_NAME repository"
