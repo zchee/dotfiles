@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ ! $# -ge 1 ]] && { echo "[ERROR] Usage: $(basename "$0") [package] <latest>"; exit 1; }
+[[ ! $# -ge 1 ]] && {
+  echo "[ERROR] Usage: $(basename "$0") [package] <latest>"
+  exit 1
+}
 
-error() { printf "\x1b[1;31m[ERROR]\x1b[0m %s\\n" "$1" >&2; exit 1; }
+error() {
+  printf "\x1b[1;31m[ERROR]\x1b[0m %s\\n" "$1" >&2
+  exit 1
+}
 
 type go >/dev/null 2>&1 || { error "go command not found"; }
 
+export GOMOD=off
+export GOWORK=off
+
 if [[ "$#" -eq 2 && "$1" == 'latest' ]]; then
-  go list -u -m -versions -mod=mod "$2" | awk -F' ' '{print $NF}'
+  go list -u -m -versions -mod=readonly "$2" | awk -F' ' '{print $NF}'
 else
-  go list -u -m -versions -mod=mod "$1"
+  go list -u -m -versions -mod=readonly "$1"
 fi
