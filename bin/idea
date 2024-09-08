@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-declare -a ideargs=()
+declare -a ideaargs=()
 declare -- wait=""
 
 for o in "$@"; do
@@ -10,14 +10,14 @@ for o in "$@"; do
     o="--wait"
   fi
   if [[ "$o" =~ " " ]]; then
-    ideargs+=("\"$o\"")
+    ideaargs+=("\"$o\"")
   else
-    ideargs+=("$o")
+    ideaargs+=("$o")
   fi
 done
 
 find_cmd="$(which find)"
-if $find_cmd --version | grep GNU > /dev/null; then
+if $find_cmd --version | grep GNU >/dev/null; then
   find_cmd+=' -O3'
 fi
 
@@ -29,4 +29,4 @@ if [[ $# -ge 1 ]]; then
   fi
 fi
 
-open -na "$($find_cmd $HOME/Library/Application\ Support/JetBrains/Toolbox/apps/IDEA-U -type f -executable -name $(basename "$0"))" "$wait" --args "${ideargs[*]}" "$path"
+open --env IDEA_VM_OPTIONS="${XDG_CONFIG_HOME}/jetbrains/vmoptions/idea.vmoptions" --env IDEA_PROPERTIES="${XDG_CONFIG_HOME}/jetbrains/idea.properties" -na "$($find_cmd "${HOME}/Applications" -type f -executable -name $(basename "$0"))" "$wait" --args "${ideaargs[*]}" "$path"

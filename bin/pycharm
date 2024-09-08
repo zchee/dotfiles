@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-declare -a ideargs=()
+declare -a pycharmargs=()
 declare -- wait=""
 
 for o in "$@"; do
@@ -10,9 +10,9 @@ for o in "$@"; do
     o="--wait"
   fi
   if [[ "$o" =~ " " ]]; then
-    ideargs+=("\"$o\"")
+    pycharmargs+=("\"$o\"")
   else
-    ideargs+=("$o")
+    pycharmargs+=("$o")
   fi
 done
 
@@ -29,4 +29,4 @@ if [[ $# -ge 1 ]]; then
   fi
 fi
 
-open -na "$($find_cmd $HOME/Library/Application\ Support/JetBrains/Toolbox/apps/PyCharm-P -type f -executable -name $(basename "$0"))" "$wait" --args "${ideargs[*]}" "$path"
+open --env PYCHARM_VM_OPTIONS="${XDG_CONFIG_HOME}/jetbrains/vmoptions/pycharm.vmoptions" -na "$($find_cmd "${HOME}/Applications" -type f -executable -name $(basename "$0"))" "$wait" --args "${pycharmargs[*]}" "$path"
