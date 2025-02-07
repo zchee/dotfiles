@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASH_XTRACEFD="5"
-PS4='$LINENO: '
-set -x
-
 export SHELL_DEBUG=${SHELL_DEBUG:-}
+if ${SHELL_DEBUG}; then
+  BASH_XTRACEFD="5"
+  PS4='$LINENO: '
+  set -x
+fi
+
 info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
 debug() { test -z "${SHELL_DEBUG}" || printf "\\x1b[1;36m[DEBUG]\\x1b[0m %s\\n\\n" "$1"; }
 
