@@ -69,22 +69,22 @@ for gomod in ${gomods}; do
 
   pushd "${MODROOT}" >/dev/null 2>&1
 
-  (${go} work sync && ${go} work vendor) >/dev/null 2>&1 || ${go} mod vendor
+  (${go} work sync && ${go} work vendor) >/dev/null 2>&1 || ${go} mod vendor || true
   mod_mode='vendor'
   if [[ -n "$($go env GOWORK)" ]]; then
     mod_mode='readonly'
   fi
 
   debug "run $${go} list -mod=$mod_mode -f=${filter} ./... | tr '\n' ' ') for \$PACKAGES variable"
-  PACKAGES="$(${go} list -e -mod=$mod_mode -f="${filter}" ./... | tr '\n' ' ')"
+  PACKAGES="$(${go} list -e -mod=$mod_mode -f="${filter}" ./... | tr '\n' ' ' || true)"
   debug "PACKAGES: ${PACKAGES}"
 
   debug "run eval ${go} install -mod=$mod_mode ${PACKAGES}"
-  eval "${go} install -v -x -mod=$mod_mode ${PACKAGES}" || true
+  ${go} install -v -x -mod=$mod_mode ${PACKAGES} || true
 
   if [[ -d "$(dirname "$gomod")/vendor" ]]; then
     GOWORK_VENDOR_PACKAGES="$(${go} list -e -mod=$mod_mode -f="$filter" "${MODROOT}"/vendor/... | tr '\n' ' ' || true)"
-    eval "${go} install -v -x -mod=$mod_mode ${GOWORK_VENDOR_PACKAGES}" || true
+    ${go} install -v -x -mod=$mod_mode ${GOWORK_VENDOR_PACKAGES} || true
     debug "GOWORK_VENDOR_PACKAGES: ${GOWORK_VENDOR_PACKAGES}"
   fi
 
