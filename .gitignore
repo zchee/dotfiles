@@ -3,6 +3,12 @@
 #  please consider a global .gitignore https://help.github.com/articles/ignoring-files
 #  please do not open a pull request to add something created by your editor or tools
 
+.config/nvim
+.local/bin/
+.local/lib/
+.local/share/
+.local/state/
+
 # ------------------------------------------------------------------------------
 # github/gitignore/Global/Archives.gitignore
 # It's better to unpack these files and commit the raw source because
@@ -362,8 +368,16 @@ Temporary Items
 *.smime
 
 # ------------------------------------------------------------------------------
-# tokens
+# sensitive files
 
-.config/benchsave/token.json
 .config/2fa
+.config/benchsave/token.json
+.config/bundle/cache/**/
 .config/gcloud/credentials/
+.config/git/*.config
+.config/git/cookies*
+.config/git/token
+.config/netrc
+.config/src-cli/*.settings.json
+.config/npmrc
+.config/github-copilot/hosts.json
