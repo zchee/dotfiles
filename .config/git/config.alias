@@ -1,0 +1,91 @@
+# Alias: based by https://github.com/jessfraz/dotfiles/blob/master/.gitconfig
+[alias]  # https://git-scm.com/docs/git-config#Documentation/git-config.txt-alias
+	a                = add
+	amend            = commit --amend --reuse-message=HEAD --gpg-sign  # Amend the currently staged files to the latest commit
+	amend-edit       = "!fn() { GIT_COMMITTER_NAME=$(git log -1 --pretty=format:'%an') GIT_COMMITTER_EMAIL=$(git log -1 --pretty=format:'%ae') git commit --amend --reuse-message=HEAD; }; fn"
+	ap               = add --patch
+	b                = branch
+	ba               = branch --all
+	branch-default   = var GIT_DEFAULT_BRANCH
+	branches         = branch -a
+	c                = commit --gpg-sign
+	ca               = "!fn() { git add -A && git commit -av --gpg-sign; }; fn"  # Commit all changes
+	ce               = "!fn() { git commit --message $1 --gpg-sign; }; fn"
+	co               = checkout
+	contributors     = shortlog --summary --numbered  # List contributors with number of commits
+	credit           = "!fn() { git commit --amend --author \"$1 <$2>\" -C HEAD; }; fn"  # Credit an author on the latest commit
+	current          = "!fn() { git rev-parse --abbrev-ref HEAD; }; fn"  # Get current branch name
+	d                = diff
+	di               = "!fn() { git diff --patch-with-stat $1 | ydiff -s -w0 --wrap; }; fn"
+	dii              = "!fn() { git diff --patch-with-stat HEAD~$1 | ydiff -s -w0 --wrap; }; git diff-index --quiet HEAD -- || clear; fn"  # `git dii $number` shows the diff between the state `$number` revisions ago and the current state
+	dm               = "!git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d"  # Remove branches that have already been merged with main, a.k.a. ‘delete merged’
+	ds               = "!fn() { git diff --patch-with-stat $1 | git-split-diffs --color | less -RFX; }; fn"
+	f                = fetch --prune --verbose
+	fa               = "!fn() { git fetch --all --prune --auto-gc --verbose; git fetch --tags --force --auto-gc --verbose; }; fn"
+	fb               = "!fn() { git branch -a --contains $1; }; fn"  # Find branches containing commit
+	fc               = "!fn() { git log --pretty=format:'%C(yellow)%h	%Cblue%ad  %Creset%s%Cgreen  [%cn] %Cred%d' --decorate --date=short $1; }; fn"  # Find commits by source code
+	fm               = "!fn() { git log --pretty=format:'%C(yellow)%h	%Cblue%ad  %Creset%s%Cgreen  [%cn] %Cred%d' --decorate --date=short --grep=$1; }; fn"  # Find commits by commit message
+	fp               = "!fn() { export USER_BRANCH=(${(s/:/)$2}); git fetch origin pull/$1/head:$USER_BRANCH[2] && git branch --move $USER_BRANCH[2] pull/$1/$USER_BRANCH[1] $USER_BRANCH[2]; unset USER_BRANCH; }; fn"
+	ft               = "!fn() { git describe --always --contains $1; }; fn"  # Find tags containing commit
+	fullgc           = "!fn() { git reflog expire --expire=now --all && git gc --prune=now --aggressive; }; fn"  # full garbage colletion
+	go               = "!fn() { git checkout -b \"$1\" 2> /dev/null || git checkout \"$1\"; }; fn"  # Switch to a branch, creating it if necessary
+	graph            = log --graph --color --pretty=format:"%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n"  # Color graph log view
+	hash             = "!fn() { printf $(git rev-parse --short=12 --verify HEAD); }; fn"
+	hash10           = "!fn() { printf $(git rev-parse --short=10 --verify HEAD); }; fn"
+	hash7            = "!fn() { printf $(git rev-parse --short=7 --verify HEAD); }; fn"
+	hashfull         = "!fn() { printf $(git rev-parse --verify HEAD; ); }; fn"
+	cherry-pick      = cherry-pick --gpg-sign
+	l                = log --graph --color --pretty=format:'%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n' --patch  # Display file patch level
+	la               = log --graph --color --pretty=format:'%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n' --all  # Display all refs in refs/
+	lb               = log --topo-order --pretty=format:'%C(green)%h%C(reset) %s%n%C(blue)(%ar by %an)%C(red)%d%C(reset)%n'          # Brief format(need?)
+	lc               = shortlog --summary --numbered                                                                                 # git commit summary
+	lf               = log --topo-order --stat --full-diff --graph --color --decorate=full
+	lg               = log --color --decorate --graph --pretty=format:'%C(green)%h%C(reset) %s%C(red)%d%C(reset)%n' --abbrev-commit  # refs movement graph
+	lo               = log --topo-order --pretty=format:'%C(green)%h%C(reset) %s%C(red)%d%C(reset)%n'                                # Oneline
+	ls-gone          = "!fn() { git fetch --prune > /dev/null 2>&1 && git branch -vv | grep ': gone]' | awk '{print $1}' || true; }; fn"  # https://stackoverflow.com/a/48820687/5228839
+	ls-merged-remote = "!fn() { git fetch --prune > /dev/null 2>&1 && git branch main --merged | grep -v main || true; }; fn"  # https://stackoverflow.com/a/48820687/5228839
+	lsign            = log --graph --color --pretty=format:'%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%x20(%ce)%n%x20%s%n' --show-signature  # Show sign signature
+	# merge            = merge --gpg-sign
+	ma               = merge --abort
+	mc               = merge --continue
+	mdiff            = "!fn() { git stash | head -1 | grep -q 'No local changes to save'; x=$?; git merge --no-commit $1 &>/dev/null; git add -u &>/dev/null; git diff --staged; git reset --hard &>/dev/null; test $x -ne 0 && git stash pop &>/dev/null; }; fn"
+	merged           = "!fn() { git branch --merged | grep -E -v '(^*|master|main)' 2>/dev/null; git for-each-ref refs/heads/ '--format=%(refname:short)' | while read branch; do { ancestor=$(git merge-base $(git symbolic-ref --short HEAD) $branch); if [[ $(git cherry $(git symbolic-ref --short HEAD) $(git commit-tree $(git rev-parse \"$branch^{tree}\") -p $ancestor -m _)) == \"-\"* ]]; then echo $branch; fi; }; done }; fn"
+	p                = push
+	pall             = "!fn() { git pull && git submodule foreach git pull origin main; }; fn"  # Pull in remote changes for the current repository and all its submodules
+	pF               = push --force
+	pm               = "!fn() { git pull origin $(git rev-parse --abbrev-ref HEAD); }; fn"  # pull origin's current branch into local
+	prune-branches   = "!fn() { BRANCHES=$(git branch --merged | grep -E -v '(^*|master|main)' | awk '{print $1}'); if [[ -n $BRANCHES ]]; then for b in $BRANCHES; do git branch --delete $b; done; fi; }; fn"
+	r                = rebase --gpg-sign
+	r-edit           = "!fn() { git -c rebase.instructionFormat='%s%nexec GIT_COMMITTER_NAME=\"%cN\" GIT_COMMITTER_EMAIL=\"%cE\" git commit --amend --no-edit' rebase --gpg-sign $*; }; fn"
+	r-edit-nogpg     = "!fn() { git -c rebase.instructionFormat='%s%nexec GIT_COMMITTER_NAME=\"%cN\" GIT_COMMITTER_EMAIL=\"%cE\" git commit --amend --no-edit --no-gpg-sign' rebase --no-gpg-sign $*; }; fn"
+	ra               = rebase --abort
+	rc               = rebase --continue
+	reb              = "!fn() { git rebase -i HEAD~$1; }; fn"  # Interactive rebase with the given number of latest commits
+	rebase-merge     = rebase --no-ff --merge --gpg-sign
+	remote-add       = "!fn() { git remote add $(echo $1 | cut -d/ -f4) $1; }; fn"
+	remotes          = remote -v
+	revert           = revert --gpg-sign
+	reword           = commit --amend --gpg-sign  # use commit, but edit the commit message
+	rs               = rebase --skip
+	s                = status
+	# see              = "!fn() { set -x && local branch=$(git branch --show-current || git describe --tags) && local flags='' && if [ ${branch} != $(git var GIT_DEFAULT_BRANCH) ]; then flags="-b ${branch}"; fi && gh repo view -w $(git remote get-url origin) ${flags}; }; fn"
+	switch-main      = "!fn() { git branch -m master main; git fetch origin; git branch -u origin/main main; git remote set-head origin -a; git pull origin main; }; fn"
+	tags             = "!fn() { git tag | sort --version-sort; }; fn"  # Show verbose output about tags, branches or remotes
+	undo             = "!fn() { git reset --hard $(git rev-parse --abbrev-ref HEAD)@{${1-1}}; }; fn"  # http://postd.cc/git-undo
+	w                = switch
+	wr               = gtr
+	wt               = worktree
+
+	## old
+	# l                = log --pretty=oneline -n 20 --graph --abbrev-commit  # View abbreviated SHA, description, and history graph of the latest 20 commits
+	# lg               = log --color --decorate --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an (%G?)>%Creset' --abbrev-commit
+	# lg               = log --topo-order --all --graph --pretty=format:"${_git_log_oneline_format}"  # refs movement graph
+	# prune-branch     = "!fn() { $(git diff --quiet --exit-code); if [ ! $? = 0 ]; then echo \"error: Your local changes to the following files would be overwritten by checkout: $(git diff --name-only)\" && return 1; else git pull --quiet origin main && git checkout --quiet main && for b in $(git branch --merged | egrep -v '(^*|master|main)' | awk '{print $2}'); do git branch --delete $b; done; git checkout --quiet -; fi; }; fn"
+	# release          = "!fn() { git tag --sign -a v$1 -m 'v$1'; }; fn"  # release new version
+	# see              = "!fn() { BROWSER= hub browse $1; }; fn"  # https://github.com/paulirish/git-open, or "!see() { git web--browse https://$(git remote get-url origin | sed 's/git@github.com:/github.com\\//g'); }; see"  # Open a GitHub page in the default browser with git standalone
+	# tag              = tag --sign  # Always tag with GPG-sign
+
+	## dangerous? alias
+	# delete-squashed  = "!fn() { local targetBranch=${1:-main} && git checkout -q $targetBranch && git branch --merged | grep -v \"\\*\" | xargs -n 1 git branch -d && git for-each-ref refs/heads/ \"--format=%(refname:short)\" | while read branch; do mergeBase=$(git merge-base $targetBranch $branch) && [[ $(git cherry $targetBranch $(git commit-tree $(git rev-parse $branch^{tree}) -p $mergeBase -m _)) == \"-\"* ]] && git branch -D $branch; done; }; fn"
+
+# vim:ft=gitconfig
