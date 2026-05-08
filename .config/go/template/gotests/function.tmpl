@@ -72,13 +72,13 @@ func {{.TestName}}(t *testing.T) {
 			{{- end}}
 			{{- if .ReturnsError}}
 				if {{if .OnlyReturnsError}} err := {{template "call" $f}}; {{end}} (err != nil) != tt.wantErr {
-					t.Fatalf("{{template "message" $f}} error = %v, wantErr %v", {{template "inputs" $f}} err, tt.wantErr)
+					t.Errorf("{{template "message" $f}} error = %v, wantErr %v", {{template "inputs" $f}} err, tt.wantErr)
+					return
 				}
         {{- if .TestResults}}
 					if tt.wantErr {
-						return
+						{{- if .Subtests -}}return{{- else -}}continue{{- end -}}
 					}
-					{{if .Subtests }}return{{else}}continue{{end}}
         {{- end}}
 			{{- end}}
 			{{- range .TestResults}}
@@ -88,12 +88,14 @@ func {{.TestName}}(t *testing.T) {
 					if {{if $f.OnlyReturnsOneValue}}{{Got .}} := {{template "inline" $f}}; {{end}} {{Got .}} != tt.{{Want .}} {
 				{{- else}}
 				{{if $f.OnlyReturnsOneValue}}{{Got .}} := {{template "call" $f}}{{end}}
-					if diff := cmp.Diff(tt.{{Want .}}, {{Got .}}); diff != "" {
+					if diff := gocmp.Diff(tt.{{Want .}}, {{Got .}}); diff != "" {
 				{{- end}}
 				{{- if or .IsWriter .IsBasicType}}
-						t.Fatalf("{{template "message" $f}} {{if $f.ReturnsMultiple}}{{Got .}} {{end}}= %v, want %v", {{template "inputs" $f}} {{Got .}}, tt.{{Want .}})
+						t.Errorf("{{template "message" $f}} {{if $f.ReturnsMultiple}}{{Got .}} {{end}}= %v, want %v", {{template "inputs" $f}} {{Got .}}, tt.{{Want .}})
+						return
 				{{- else}}
-						t.Fatalf("{{template "message" $f}}: (-want +got):\n%s", diff)
+						t.Errorf("{{template "message" $f}}: (-want +got):\n%s", {{template "inputs" $f}} diff)
+						return
 				{{- end}}
 					}
 			{{- end}}

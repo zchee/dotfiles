@@ -1,11 +1,11 @@
-{{define "header"}}
-{{range .Comments}}{{.}}
-{{end -}}
-package {{.Package}}
+{{ define "header" }}
+{{ range .Comments }}{{ . }}
+{{ end -}}
+package {{ .Package }}
 
 import (
-{{range .Imports}}{{.Name}} {{.Path}}
-{{end -}}
-"github.com/google/go-cmp/cmp"
+	{{ range .Imports }}{{ .Name }} {{ .Path }}
+	{{ end -}}
+	gocmp "github.com/google/go-cmp/cmp"
 )
-{{end}}
+{{ end }}
