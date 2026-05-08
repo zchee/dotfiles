@@ -4,6 +4,21 @@
 # local wiki
 .wiki
 
+# AI
+.agent/
+.agents/assets/*
+.agents/PLANS.md
+.agents/plans/**/*.md
+.claude/settings.local.json
+.abcoder.ast.json
+.aider*
+.claude-trace
+.crush
+CLAUDE.local.md
+.claw/sessions/
+.omc/
+.omx/
+
 # Go:
 # pprof
 *.pprof
@@ -15,6 +30,19 @@ bench*.txt
 debug.actiongraph.json
 # -debug-trace
 debug.trace.json
+# coverage
+coverage.*
+# spanner
+.spanner_cli.cnf
+# protols
+.protols/
+
+# Zig
+zig-pkg/
+
+# Rust:
+on/
+target/
 
 # C C++:
 # ckati
@@ -23,17 +51,14 @@ env.sh
 ninja.sh
 compile_commands*.json
 !testdata/compile_commands.json
-# libclang TranslationUnit
+# llvm/libclang TranslationUnit
 *.tu
-# clangd-indexer
-.cache/
-*/.cache/clangd/
-clangd.dex
-clangd.idx
+# clangd
+.cache/clangd/
+clangd.*
 .clangd
-
-# deoplete-clang
-.clang
+## Metal
+*.metallib
 # doxygen database
 doxygen_sqlite3.db
 # google/navc
@@ -47,14 +72,20 @@ doxygen_sqlite3.db
 # Temporary files
 !__init__.py
 *.pyo
+.venv
 venv
 .mypy_cache
 pytype_output/
+*egg-info/
+
+# Nodejs
+*.bun-build
 
 # secret token
 .netrc
 *.env*
 *.envrc*
+!.envrc.sample
 
 # hg
 .hg
@@ -103,6 +134,7 @@ old*.txt
 new*.txt
 bench.txt
 coverage.html
+gopls.mod
 
 # github.com/dxa4481/truffleHog
 include-patterns.txt
@@ -464,6 +496,7 @@ Temporary Items
 
 ## OSCP request data
 *.org
+!*.org/
 
 ## PKCS #12
 *.p12
