@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck shell=bash
+
+UV_INSTALL_PATH="${UV_PATH:-/opt/local/bin}"
+
+REPOS='astral-sh/uv zchee/uv'
+BRANCH=${2:-main}
+PATTERNS="uv-$(uname -sm | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | sed 's|darwin|macos|' | sed 's|arm64|aarch64|')*"
+WORKFLOW='CI'
+
+DOWNLOAD_DIR="$(mktemp -d)"
+pushd "${DOWNLOAD_DIR}" >/dev/null 2>&1
+
+for repo in ${REPOS}; do
+  RUN_IDS=$(gh run list --repo "${repo}" --branch "${BRANCH}" --workflow ${WORKFLOW} --json 'databaseId' --limit 3 --jq '.[] | .databaseId')
+  success=false
+  for id in ${RUN_IDS}; do
+    if (gh run download --repo "${repo}" --pattern "${PATTERNS}" --dir "${DOWNLOAD_DIR}" "${id}"); then
+      echo "repo: $repo, id: ${id}"
+      success=true
+      break
+    fi
+  done
+  if [ "$success" = true ]; then
+    break
+  fi
+done
+
+UV_DIR=$(find "${DOWNLOAD_DIR}" -maxdepth 1 -type d -name 'uv-*')
+rm -f "${UV_INSTALL_PATH}/{uv,uvx}"
+mv "${UV_DIR}"/{uv,uvx} "${UV_INSTALL_PATH}"
+
+"${UV_INSTALL_PATH}/uv" generate-shell-completion zsh | tee "${XDG_CONFIG_HOME}/zsh/completions/_uv" >/dev/null 2>&1
+
+rm -rf "${DOWNLOAD_DIR}"
