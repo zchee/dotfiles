@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+
+info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
+
+CODEX_PATH="${CODEX_PATH:-/opt/local/codex}"
+
+# Checks whether the codex binary exists
+CODEX_VERSION=
+if test -f "${CODEX_PATH}/bin/codex"; then
+  CODEX_VERSION=$("${CODEX_PATH}/bin/codex" --version)
+  info "Current codex version:
+${CODEX_VERSION}"
+fi
+
+# Checks codex latest version
+info "Checking for Codex latest version..."
+CODEX_REPO=openai/codex
+CODEX_RELEASE=$(gh release list --repo ${CODEX_REPO} --limit 1 --json tagName --jq '.[] | select(.tagName | startswith("rust-")) | .tagName')
+
+# Checks whether the up to date
+if [[ ${CODEX_VERSION} = *"${CODEX_RELEASE##rust-v}" ]]; then
+  info "Codex is up to date (${CODEX_RELEASE})"
+  exit 0
+fi
+
+# Install codex, codex-app-server and codex-responses-api-proxy binaries
+info "Download Codex \"${CODEX_RELEASE}\" version"
+
+mv "${CODEX_PATH}" "${CODEX_PATH}.bak"
+mkdir -p "${CODEX_PATH}/bin"
+
+TMP_DIR="$(mktemp -d)"
+pushd "${TMP_DIR}" >/dev/null 2>&1 || exit
+
+OS_ARCH="$(printf "%s-apple-%s" $(uname -m | sed 's|arm64|aarch64|') $(uname -s | tr '[:upper:]' '[:lower:]'))"
+
+gh release download --pattern "codex-${OS_ARCH}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+gh release download --pattern "codex-app-server-${OS_ARCH}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+gh release download --pattern "codex-responses-api-proxy-${OS_ARCH}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+
+zstd -q -d "codex-${OS_ARCH}.zst"
+chmod +x "codex-${OS_ARCH}"
+mv "codex-${OS_ARCH}" "${CODEX_PATH}/bin/codex"
+
+zstd -q -d "codex-app-server-${OS_ARCH}.zst"
+chmod +x "codex-app-server-${OS_ARCH}"
+mv "codex-app-server-${OS_ARCH}" "${CODEX_PATH}/bin/codex-app-server"
+
+zstd -q -d "codex-responses-api-proxy-${OS_ARCH}.zst"
+chmod +x "codex-responses-api-proxy-${OS_ARCH}"
+mv "codex-responses-api-proxy-${OS_ARCH}" "${CODEX_PATH}/bin/codex-responses-api-proxy"
+
+curl -o codex-standalone-install.sh -fsSL https://chatgpt.com/codex/install.sh
+
+export CODEX_RELEASE
+export CODEX_INSTALL_DIR="${CODEX_PATH}/bin"
+
+if ! expect <<'EOF'
+set timeout -1
+
+spawn -noecho env CODEX_INSTALL_DIR=$env(CODEX_INSTALL_DIR) bash ./codex-standalone-install.sh --release $env(CODEX_RELEASE)
+
+expect {
+  -re {Uninstall the existing .* Codex now\? \[y/N\]} {
+    send "n\r"
+    exp_continue
+  }
+  -re {Start Codex now\? \[y/N\]} {
+    send "n\r"
+    exp_continue
+  }
+  eof
+}
+
+set exit_status [lindex [wait] 3]
+exit $exit_status
+EOF
+then
+  echo "Failed to install Codex standalone package" >&2
+fi
+
+curl -sSLO "https://raw.githubusercontent.com/openai/codex/refs/tags/${CODEX_RELEASE}/.github/actions/macos-code-sign/codex.entitlements.plist"
+codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" "${CODEX_HOME}/packages/standalone/current/codex"
+codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" /opt/local/codex/bin/codex-app-server
+codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" /opt/local/codex/bin/codex-responses-api-proxy
+
+# Install zed-industries/codex-acp binary
+CODEX_ACP_REPO=zed-industries/codex-acp
+CODEX_ACP_RELEASE=$(gh release list --repo ${CODEX_ACP_REPO} --limit 1 --json tagName --jq '.[] | .tagName')
+
+info "Download codex-acp \"${CODEX_ACP_RELEASE}\" version"
+
+gh release download --pattern "codex-acp-${CODEX_ACP_RELEASE##v}-${OS_ARCH}.tar.gz" --repo "${CODEX_ACP_REPO}" "${CODEX_ACP_RELEASE}"
+tar xf "codex-acp-${CODEX_ACP_RELEASE##v}-${OS_ARCH}.tar.gz"
+mv "codex-acp" "${CODEX_PATH}/bin/codex-acp"
+
+popd >/dev/null 2>&1 || exit
+
+rm -rf "${TMP_DIR}"
+rm -rf "${CODEX_PATH}.bak"
+
+"${CODEX_PATH}/bin/codex" completion zsh | tee "${HOME}/.config/zsh/completions/_codex" >/dev/null 2>&1
+
+info "Successfully updated Codex:
+$("${CODEX_PATH}/bin/codex" --version)"
+
+info "Successfully updated codex-acp:
+${CODEX_ACP_RELEASE}"
