@@ -98,7 +98,7 @@ imports = ['/etc/containerd/conf.d/*.toml']
       use_internal_loopback = false
 
   [plugins.'io.containerd.differ.v1.erofs']
-    mkfs_options = []
+    mkfs_options = ['-b4096']
     enable_tar_index = false
     enable_dmverity = false
 
@@ -170,8 +170,8 @@ imports = ['/etc/containerd/conf.d/*.toml']
 
   [plugins.'io.containerd.server.v1.grpc']
     address = '/var/run/containerd/containerd.sock'
-    uid = 0
-    gid = 0
+    uid = 501
+    gid = 20
     max_recv_message_size = 16777216
     max_send_message_size = 16777216
 
@@ -189,8 +189,8 @@ imports = ['/etc/containerd/conf.d/*.toml']
 
   [plugins.'io.containerd.server.v1.ttrpc']
     address = '/var/run/containerd/containerd.sock.ttrpc'
-    uid = 0
-    gid = 0
+    uid = 501
+    gid = 20
 
   [plugins.'io.containerd.service.v1.diff-service']
     default = ['erofs', 'walking']
@@ -216,7 +216,7 @@ imports = ['/etc/containerd/conf.d/*.toml']
     ovl_mount_options = []
     enable_fsverity = false
     set_immutable = false
-    default_size = ''
+    default_size = '64M'
     dmverity_mode = ''
 
   [plugins.'io.containerd.snapshotter.v1.native']
@@ -231,6 +231,10 @@ imports = ['/etc/containerd/conf.d/*.toml']
     check_platform_supported = false
     config_path = ''
     max_concurrent_unpacks = 1
+    [[plugins.'io.containerd.transfer.v1.local'.unpack_config]]
+      platform = "linux/arm64"
+      snapshotter = "erofs"
+      differ = "erofs"
 
 [cgroup]
   path = ''
