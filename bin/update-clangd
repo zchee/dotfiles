@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck shell=bash
+
+BIN="${0##*-}"
+
+info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n" "$1"; }
+
+CLANGD_PATH="${CLANGD_PATH:-/opt/local/llvm/clangd}"
+
+if [[ -f ${CLANGD_PATH}/bin/$BIN ]]; then
+  info "Current $BIN version:
+$("${CLANGD_PATH}/bin/$BIN" --version)
+"
+
+  mv "${CLANGD_PATH}" "${CLANGD_PATH}.bak"
+fi
+
+TMP_DIR="$(mktemp -d)"
+pushd "${TMP_DIR}" >/dev/null 2>&1
+
+REPO=clangd/clangd
+RELEASES=$(gh release list --repo ${REPO} --limit 3 --order desc --json tagName --jq '.[] | .tagName')
+RELEASE=
+for r in ${RELEASES}; do
+  if (gh release view --repo ${REPO} "$r" --json assets --jq '.assets.[].name' | grep 'clangd-mac-snapshot'); then
+    RELEASE="$r"
+    break
+  fi
+done
+
+gh release download --pattern "clangd-mac-${RELEASE}.zip" --repo ${REPO} "$r"
+gh release download --pattern "clangd_indexing_tools-mac-${RELEASE}.zip" --repo ${REPO} "$r"
+unzip "clangd-mac-${RELEASE}.zip"
+mv "clangd_${RELEASE}" clangd
+unzip "clangd_indexing_tools-mac-${RELEASE}.zip"
+ditto "clangd_${RELEASE}" clangd
+mv clangd "${CLANGD_PATH}"
+
+# rm -rf "${CLANGD_PATH}.bak"
