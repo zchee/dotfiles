@@ -16,7 +16,7 @@ fi
 # Checks codex latest version
 info "Checking for Codex latest version..."
 CODEX_REPO=openai/codex
-CODEX_RELEASE=$(gh release list --repo ${CODEX_REPO} --limit 1 --json tagName --jq '.[] | select(.tagName | startswith("rust-")) | .tagName')
+CODEX_RELEASE=${1:-$(gh release list --repo ${CODEX_REPO} --limit 1 --json tagName --jq '.[] | select(.tagName | startswith("rust-")) | .tagName')}
 
 # Checks whether the up to date
 if [[ ${CODEX_VERSION} = *"${CODEX_RELEASE##rust-v}" ]]; then
@@ -33,57 +33,113 @@ mkdir -p "${CODEX_PATH}/bin"
 TMP_DIR="$(mktemp -d)"
 pushd "${TMP_DIR}" >/dev/null 2>&1 || exit
 
-OS_ARCH="$(printf "%s-apple-%s" $(uname -m | sed 's|arm64|aarch64|') $(uname -s | tr '[:upper:]' '[:lower:]'))"
-
-gh release download --pattern "codex-${OS_ARCH}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
-gh release download --pattern "codex-app-server-${OS_ARCH}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
-gh release download --pattern "codex-responses-api-proxy-${OS_ARCH}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
-
-zstd -q -d "codex-${OS_ARCH}.zst"
-chmod +x "codex-${OS_ARCH}"
-mv "codex-${OS_ARCH}" "${CODEX_PATH}/bin/codex"
-
-zstd -q -d "codex-app-server-${OS_ARCH}.zst"
-chmod +x "codex-app-server-${OS_ARCH}"
-mv "codex-app-server-${OS_ARCH}" "${CODEX_PATH}/bin/codex-app-server"
-
-zstd -q -d "codex-responses-api-proxy-${OS_ARCH}.zst"
-chmod +x "codex-responses-api-proxy-${OS_ARCH}"
-mv "codex-responses-api-proxy-${OS_ARCH}" "${CODEX_PATH}/bin/codex-responses-api-proxy"
-
-curl -o codex-standalone-install.sh -fsSL https://chatgpt.com/codex/install.sh
-
-export CODEX_RELEASE
-export CODEX_INSTALL_DIR="${CODEX_PATH}/bin"
-
-if ! expect <<'EOF'
-set timeout -1
-
-spawn -noecho env CODEX_INSTALL_DIR=$env(CODEX_INSTALL_DIR) bash ./codex-standalone-install.sh --release $env(CODEX_RELEASE)
-
-expect {
-  -re {Uninstall the existing .* Codex now\? \[y/N\]} {
-    send "n\r"
-    exp_continue
-  }
-  -re {Start Codex now\? \[y/N\]} {
-    send "n\r"
-    exp_continue
-  }
-  eof
-}
-
-set exit_status [lindex [wait] 3]
-exit $exit_status
-EOF
-then
-  echo "Failed to install Codex standalone package" >&2
+ARCH_NAME=$(uname -m | sed 's|arm64|aarch64|')
+VENDOR_NAME=
+case $OSTYPE in
+  darwin*)
+    VENDOR_NAME='apple'
+    ;;
+  linux*)
+    VENDOR_NAME='unknown'
+    ;;
+esac
+OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
+PATTERN="$(printf "%s-%s-%s" "${ARCH_NAME}" "${VENDOR_NAME}" "${OS_NAME}")"
+if [[ ${OS_NAME} == "linux" ]]; then
+  PATTERN="${PATTERN}-musl"
 fi
 
-curl -sSLO "https://raw.githubusercontent.com/openai/codex/refs/tags/${CODEX_RELEASE}/.github/actions/macos-code-sign/codex.entitlements.plist"
-codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" "${CODEX_HOME}/packages/standalone/current/codex"
-codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" /opt/local/codex/bin/codex-app-server
-codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" /opt/local/codex/bin/codex-responses-api-proxy
+gh release download --pattern "codex-${PATTERN}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+gh release download --pattern "codex-app-server-${PATTERN}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+gh release download --pattern "codex-responses-api-proxy-${PATTERN}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+gh release download --pattern "codex-code-mode-host-${PATTERN}.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+# gh release download --pattern "codex-zsh-${OS_ARCH}.tar.gz" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+
+if [[ ${VENDOR_NAME} == "unknown" ]]; then
+  gh release download --pattern "bwrap-${PATTERN}-musl.zst" --repo "${CODEX_REPO}" "${CODEX_RELEASE}"
+fi
+
+zstd -q -d "codex-${PATTERN}.zst"
+chmod +x "codex-${PATTERN}"
+mv "codex-${PATTERN}" "${CODEX_PATH}/bin/codex"
+
+zstd -q -d "codex-app-server-${PATTERN}.zst"
+chmod +x "codex-app-server-${PATTERN}"
+mv "codex-app-server-${PATTERN}" "${CODEX_PATH}/bin/codex-app-server"
+
+zstd -q -d "codex-responses-api-proxy-${PATTERN}.zst"
+chmod +x "codex-responses-api-proxy-${PATTERN}"
+mv "codex-responses-api-proxy-${PATTERN}" "${CODEX_PATH}/bin/codex-responses-api-proxy"
+
+zstd -q -d "codex-code-mode-host-${PATTERN}.zst"
+chmod +x "codex-code-mode-host-${PATTERN}"
+mv "codex-code-mode-host-${PATTERN}" "${CODEX_PATH}/bin/codex-code-mode-host"
+
+# tar xf "${TMP_DIR}/codex-zsh-${OS_ARCH}.tar.gz"
+# mv codex-zsh "${CODEX_PATH}/"
+
+if [[ ${OS_NAME} == "linux" ]]; then
+  zstd -q -d "bwrap-${PATTERN}-musl.zst"
+  chmod +x "bwrap-${PATTERN}-musl"
+  mv "bwrap-${PATTERN}-musl" "${CODEX_PATH}/bin/bwrap"
+fi
+
+curl -o codex-standalone-install.sh -fsSL https://chatgpt.com/codex/install.sh
+# remove inject ~/.local/bin PATh to ~/.zprofile
+sed -i ':a;N;$!ba;s|add_to_path\n||g' codex-standalone-install.sh
+# avoid rate limit error when downloading codex-standalone-install.sh
+sed -i -E "s|(curl -fsSL)|\1 -H 'Authorization: Bearer ${GITHUB_ACCESS_TOKEN}'|g" codex-standalone-install.sh
+export CODEX_NON_INTERACTIVE=true
+export CODEX_RELEASE=${CODEX_RELEASE}
+rm -f /Users/zchee/src/github.com/zchee/homebrew-formula/Formula/update-codex.log
+touch /Users/zchee/src/github.com/zchee/homebrew-formula/Formula/update-codex.log
+bash -x codex-standalone-install.sh >> /Users/zchee/src/github.com/zchee/homebrew-formula/Formula/update-codex.log 2>&1
+
+if [[ ${OS_NAME} == "darwin" ]]; then
+  cat <<'EOF' > codex.entitlements.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    <key>com.apple.security.application-groups</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.debugger</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.disable-executable-page-protection</key>
+    <true/>
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.device.camera</key>
+    <true/>
+    <key>com.apple.security.personal-information.addressbook</key>
+    <true/>
+    <key>com.apple.security.personal-information.calendars</key>
+    <true/>
+    <key>com.apple.security.personal-information.location</key>
+    <true/>
+    <key>com.apple.security.personal-information.photos-library</key>
+    <true/>
+  </dict>
+</plist>
+EOF
+  
+  ln -fs "${CODEX_HOME}/packages/standalone/releases/${CODEX_RELEASE##rust-v}-aarch64-apple-darwin/bin/codex" "${HOME}/.local/bin/codex"
+  codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" "${CODEX_HOME}/packages/standalone/releases/${CODEX_RELEASE##rust-v}-aarch64-apple-darwin/bin/codex"
+  codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" /opt/local/codex/bin/codex-app-server
+  codesign --force --options runtime --timestamp --entitlements ./codex.entitlements.plist --sign "-" /opt/local/codex/bin/codex-responses-api-proxy
+fi
 
 # Install zed-industries/codex-acp binary
 CODEX_ACP_REPO=zed-industries/codex-acp
@@ -91,16 +147,14 @@ CODEX_ACP_RELEASE=$(gh release list --repo ${CODEX_ACP_REPO} --limit 1 --json ta
 
 info "Download codex-acp \"${CODEX_ACP_RELEASE}\" version"
 
-gh release download --pattern "codex-acp-${CODEX_ACP_RELEASE##v}-${OS_ARCH}.tar.gz" --repo "${CODEX_ACP_REPO}" "${CODEX_ACP_RELEASE}"
-tar xf "codex-acp-${CODEX_ACP_RELEASE##v}-${OS_ARCH}.tar.gz"
+gh release download --pattern "codex-acp-${CODEX_ACP_RELEASE##v}-${PATTERN}.tar.gz" --repo "${CODEX_ACP_REPO}" "${CODEX_ACP_RELEASE}"
+tar xf "codex-acp-${CODEX_ACP_RELEASE##v}-${PATTERN}.tar.gz"
 mv "codex-acp" "${CODEX_PATH}/bin/codex-acp"
 
 popd >/dev/null 2>&1 || exit
 
 rm -rf "${TMP_DIR}"
 rm -rf "${CODEX_PATH}.bak"
-
-"${CODEX_PATH}/bin/codex" completion zsh | tee "${HOME}/.config/zsh/completions/_codex" >/dev/null 2>&1
 
 info "Successfully updated Codex:
 $("${CODEX_PATH}/bin/codex" --version)"
