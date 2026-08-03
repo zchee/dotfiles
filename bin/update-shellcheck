@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-set -eo pipefail
-
-BIN="${0##*-}"
+set -euo pipefail
+# shellcheck shell=bash
 
 info() { printf "\\x1b[1;34m[INFO]\\x1b[0m %s\\n\\n" "$1"; }
+
+BIN="${0##*-}"
+SHELLCHECK_PATH="${SHELLCHECK_PATH:-/opt/local/bin/shellcheck}"
 
 info "Current $BIN version:
 $($BIN --version)"
 
-SHELLCHECK_PATH="${SHELLCHECK_PATH:-/opt/local/bin/shellcheck}"
+PATTERN="$(uname -sm | tr ' ' '.' | tr '[:upper:]' '[:lower:]' | sed 's|arm64|aarch64|')"
 
-OS=$(uname | tr '[:upper:]' '[:lower:]')
-ARCH='x86_64'
-REPO='koalaman/shellcheck'
+DOWNLOAD_DIR=$(mktemp -d)
+pushd "${DOWNLOAD_DIR}" >/dev/null 2>&1
 
-info "Download latest $BIN ..."
-TMP_DIR="$(mktemp -d)"
-pushd "$TMP_DIR" > /dev/null 2>&1
-curl -sSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/${REPO}/actions/artifacts/$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/${REPO}/actions/artifacts?per_page=3" | jq '.artifacts[2].id')/zip" | jar -xvf /dev/stdin > /dev/null 2>&1
-mv -f "${OS}.${ARCH}/$BIN" "$SHELLCHECK_PATH"
-chmod +x "$SHELLCHECK_PATH"
+curl -sSLO "https://github.com/koalaman/shellcheck/releases/download/latest/shellcheck-latest.${PATTERN}.tar.xz"
+tar xf "shellcheck-latest.${PATTERN}.tar.xz"
+mv -f "shellcheck-latest/shellcheck" "${SHELLCHECK_PATH}"
 
-info "Updated $BIN commit: $(curl -sSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/${REPO}/commits/master" | jq -r '.sha' | cut -c -12): version:
-$($BIN --version)"
+popd >/dev/null 2>&1
+rm -rf "${DOWNLOAD_DIR}"
+
+${SHELLCHECK_PATH} --version
