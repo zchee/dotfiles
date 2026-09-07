@@ -1,0 +1,166 @@
+# betterleaks configuration for zchee/dotfiles.
+#
+# Why this file exists
+# --------------------
+# This working tree *is* the live XDG config home: ~/.config and ~/bin are
+# symlinks into it. Around 140 unrelated tools therefore write their runtime
+# state -- OAuth tokens, keyrings, cookie jars, kubeconfig caches, a 4.7 GB
+# Lima VM disk image -- directly into .config/, side by side with the dozen
+# subtrees this repository actually tracks. A plain `betterleaks dir .` reads
+# roughly 11 GB of other programs' private data and reports their genuine
+# credentials as findings against this repo.
+#
+# So the prefilter below narrows the scan to what this repository can actually
+# commit: the .config/ subtrees it tracks, minus the paths its own .gitignore
+# excludes. The rule allowlists on top of that suppress two pattern-level false
+# positives. Findings that survive this config are worth acting on.
+#
+# Two ways to keep this file honest as the repo changes, neither automatic
+# because betterleaks does not read .gitignore:
+#
+#   - Adding a new tracked .config/<dir> means adding it to the keep list below,
+#     otherwise it silently goes unscanned. Re-derive the list with
+#       git ls-files .config | cut -d/ -f2 | sort -u
+#
+#   - Adding a .gitignore entry *inside* a scanned subtree means adding it to
+#     the gitignore-mirror block below, otherwise it keeps being reported.
+#     Drift check -- everything it prints should be matched by that block:
+#       git ls-files -oi --exclude-standard -- bin \
+#         .config/{bat,boilerplate,clangd,containerd,git,go,kitty,launchd,lima,rg,sysctl,zsh}
+#
+# Two betterleaks behaviours this file depends on
+# ----------------------------------------------
+# 1. A top-level `prefilter` REPLACES the default config's prefilter instead of
+#    extending it, so the upstream patterns are inlined verbatim below. Re-sync
+#    them on upgrade with `betterleaks config show | head -40` (last synced with
+#    betterleaks 1.8.1 / gitleaks v8.25.0).
+# 2. The prefilter is evaluated for directories as well as files, and a
+#    directory path has no trailing slash. Every subtree pattern must therefore
+#    end in `(?:/|$)`: a pattern ending in `/` never matches the directory
+#    itself, so under a negation it prunes the whole subtree before its files
+#    are ever visited.
+#
+# Paths are relative to the process working directory, so run this from the
+# repository root (`cd $(git rev-parse --show-toplevel) && betterleaks dir .`).
+# Invoked with an absolute target the `^\.config/` anchors stop matching and the
+# scan falls back to covering everything -- noisy, but never silently narrowed.
+
+title = 'betterleaks config for zchee/dotfiles'
+
+prefilter = '''
+// Upstream default prefilter, inlined verbatim -- see note 1 above.
+matchesAny(attributes["path"], [
+  `gitleaks\.toml`,
+  `(?i)\.(?:bmp|gif|jpe?g|png|svg|tiff?)$`,
+  `(?i)\.(?:eot|[ot]tf|woff2?)$`,
+  `(?i)\.(?:docx?|xlsx?|pdf|bin|socket|vsidx|v2|suo|wsuo|dll|pdb|exe|gltf)$`,
+  `go\.(?:mod|sum|work(?:\.sum)?)$`,
+  `(?:^|/)vendor/modules\.txt$`,
+  `(?:^|/)vendor/(?:github\.com|golang\.org/x|google\.golang\.org|gopkg\.in|istio\.io|k8s\.io|sigs\.k8s\.io)(?:/.*)?$`,
+  `(?:^|/)gradlew(?:\.bat)?$`,
+  `(?:^|/)gradle\.lockfile$`,
+  `(?:^|/)mvnw(?:\.cmd)?$`,
+  `(?:^|/)\.mvn/wrapper/MavenWrapperDownloader\.java$`,
+  `(?:^|/)node_modules(?:/.*)?$`,
+  `(?:^|/)(?:deno\.lock|npm-shrinkwrap\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$`,
+  `(?:^|/)bower_components(?:/.*)?$`,
+  `(?:^|/)(?:angular|bootstrap|jquery(?:-?ui)?|plotly|swagger-?ui)[a-zA-Z0-9.-]*(?:\.min)?\.js(?:\.map)?$`,
+  `(?:^|/)javascript\.json$`,
+  `(?:^|/)(?:Pipfile|poetry)\.lock$`,
+  `(?i)(?:^|/)(?:v?env|virtualenv)/lib(?:64)?(?:/.*)?$`,
+  `(?i)(?:^|/)(?:lib(?:64)?/python[23](?:\.\d{1,2})+|python/[23](?:\.\d{1,2})+/lib(?:64)?)(?:/.*)?$`,
+  `(?i)(?:^|/)[a-z0-9_.]+-[0-9.]+\.dist-info(?:/.+)?$`,
+  `(?:^|/)vendor/(?:bundle|ruby)(?:/.*?)?$`,
+  `\.gem$`,
+  `verification-metadata\.xml`,
+  `Database.refactorlog`,
+  `(?:^|/)\.git$`
+])
+
+// Generated and OS-owned artifacts that live anywhere in the tree.
+|| matchesAny(attributes["path"], [
+  `(?:^|/)__pycache__(?:/|$)`,
+  `\.py[co]$`,
+  `(?:^|/)\.DS_Store$`,
+  `(?:^|/)\.mypy_cache(?:/|$)`,
+  `(?:^|/)\.ruff_cache(?:/|$)`,
+  `(?:^|/)\.pytest_cache(?:/|$)`
+])
+
+// Backup and temporary suffixes that .gitignore excludes repo-wide.
+|| matchesAny(attributes["path"], [
+  `\.(?:bak|gho|ori|orig|tmp)$`
+])
+
+// Mirror of .gitignore entries that fall *inside* otherwise-scanned subtrees.
+// These paths cannot reach a commit, so they are out of scope for a repo
+// secret scan, but betterleaks does not read .gitignore and would keep
+// reporting them. Each entry names the .gitignore rule behind it; re-derive
+// the set with the drift check in the header after editing .gitignore.
+|| matchesAny(attributes["path"], [
+  // `.config/lima/default` -- the running VM: a 4.7 GB qcow2 disk, cidata.iso
+  // and host-agent logs.
+  `^\.config/lima/default(?:/|$)`,
+  // `.config/lima/_config` -- Lima's generated VM SSH identity. The directory
+  // itself stays scanned because networks.yaml is tracked.
+  `^\.config/lima/_config/user(?:\.pub)?$`,
+  // `.config/git/token`, `.config/git/cookies*` -- credential and cookie
+  // stores sitting next to the tracked git config.
+  `^\.config/git/(?:token|cookies)`,
+  // `.config/go/` -- only .config/go/template is tracked; the rest is Go
+  // toolchain state (env files, gopls scratch, telemetry counters).
+  `^\.config/go/(?:env|gopls|telemetry)(?:/|$)`,
+  // `.config/zsh/completions/`, `_tmp/` -- generated completion dumps.
+  `^\.config/zsh/(?:completions|_tmp)(?:/|$)`,
+  // `bin/oauth2.rb` -- a scratch Google OAuth walkthrough that still holds a
+  // real client secret and refresh token. Ignoring it keeps it out of the
+  // repo; it does not revoke anything.
+  `^bin/oauth2\.rb$`
+])
+
+// Everything under .config/ that this repo does not track belongs to some
+// other program, so treat it as foreign runtime state rather than repo
+// content. Keep this list in step with `git ls-files .config | cut -d/ -f2 |
+// sort -u`.
+|| (
+  matchesAny(attributes["path"], [`^\.config/`])
+  && !matchesAny(attributes["path"], [
+    `^\.config/(?:bat|boilerplate|clangd|containerd|git|go|kitty|launchd|lima|rg|sysctl|zsh)(?:/|$)`
+  ])
+)
+'''
+
+[extend]
+useDefault = true
+
+# A value identical to the credential word it is assigned to is a variable
+# reference or a serialisation key, never a literal -- `"password": password`
+# in bin/safaribooks is Python passing a local through to a JSON body. The
+# placeholder alternatives cover the documentation-style stand-ins that show up
+# in vendored scripts.
+[[rules]]
+id = 'generic-password'
+
+  [[rules.allowlists]]
+  description = 'Bare identifier or documentation placeholder in place of a password literal'
+  regexTarget = 'secret'
+  regexes = [
+    '''^(?i:pass|passwd|password|passphrase|pwd|secret|token|credential|credentials)$''',
+    '''^(?i:change[_-]?me|your[_-]?(?:password|secret|token)|my[_-]?password|placeholder|redacted|dummy|example|sample|s3cr3t|hunter2)$''',
+    '''^<[^>]{1,64}>$''',
+    '''^\[[^\]]{1,64}\]$''',
+  ]
+
+# The `token:` half of a Marketo Munchkin cookie (`_mkto_trk`) is a web
+# analytics visitor id of the form `_mch-<domain>-<epoch_ms>-<counter>`. It
+# grants nothing and carries enough entropy to read as an API key, so match it
+# by shape rather than by the file that happens to contain it.
+[[rules]]
+id = 'generic-api-key'
+
+  [[rules.allowlists]]
+  description = 'Marketo Munchkin analytics visitor id, not a credential'
+  regexTarget = 'secret'
+  regexes = [
+    '''^_mch-[A-Za-z0-9._-]{1,64}-\d{13}-\d{1,10}$''',
+  ]
