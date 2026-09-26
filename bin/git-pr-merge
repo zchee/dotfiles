@@ -30,6 +30,8 @@ case "${1-}" in
 esac
 number="${1-}"
 [[ -n "${number}" ]] || usage
+shift
+(($# == 0)) || usage
 if ! [[ "${number}" =~ ^[0-9]+$ ]]; then
   echo "git pr-merge: '${number}' is not a PR number" >&2
   exit 2
