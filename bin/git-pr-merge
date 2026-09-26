@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# git pr-merge: land a GitHub pull request on the default branch with a
+# signed --no-ff merge commit, keeping the branch's own commits.
+#
+#   git pr-merge [--external] <pr-number>
+#
+# The head branch, its owner, whether it lives in a fork, and the PR state
+# are read from the PR through `gh pr view`; a PR that is not OPEN is refused.
+#
+# A head branch that lives in this repository is first rebased onto the
+# default branch with signed commits and pushed with --force-with-lease, so
+# the PR shows exactly the commits that land. A head that lives in a fork, or
+# any PR run with --external (alias --no-rebase), is fetched from
+# refs/pull/N/head into a temporary pr-N branch and merged as-is: a
+# contributor's branch is never rewritten. Never squashes.
+set -euo pipefail
+
+usage() {
+  echo "usage: git pr-merge [--external] <pr-number>" >&2
+  exit 2
+}
+
+external=0
+case "${1-}" in
+  --external | --no-rebase)
+    external=1
+    shift
+    ;;
+  -h | --help) usage ;;
+esac
+number="${1-}"
+[[ -n "${number}" ]] || usage
+if ! [[ "${number}" =~ ^[0-9]+$ ]]; then
+  echo "git pr-merge: '${number}' is not a PR number" >&2
+  exit 2
+fi
+
+base="$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')"
+base="${base:-main}"
+
+if ! meta="$(gh pr view "${number}" --json headRepositoryOwner,headRefName,isCrossRepository,state \
+  -q '"\(.headRepositoryOwner.login) \(.headRefName) \(.isCrossRepository) \(.state)"')" \
+  || [[ -z "${meta}" ]]; then
+  echo "git pr-merge: cannot resolve PR #${number} head (is gh authenticated?)" >&2
+  exit 1
+fi
+read -r owner branch cross state <<<"${meta}"
+
+if [[ "${state}" != OPEN ]]; then
+  echo "git pr-merge: PR #${number} is ${state}, not OPEN" >&2
+  exit 2
+fi
+[[ "${cross}" == false ]] || external=1
+
+git switch -q "${base}"
+git pull -q --ff-only origin "${base}"
+
+if ((external)); then
+  git fetch -q origin "pull/${number}/head:pr-${number}"
+  head="pr-${number}"
+else
+  git switch -q "${branch}"
+  git rebase --gpg-sign "${base}"
+  git push --force-with-lease origin "${branch}"
+  git switch -q "${base}"
+  head="${branch}"
+fi
+
+git merge --no-ff --gpg-sign -m "Merge pull request #${number} from ${owner}/${branch}" "${head}"
+git push origin "${base}"
+if ((external)); then
+  git branch -q -D "pr-${number}"
+fi
