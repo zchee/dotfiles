@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# tmux wrapper: retries `respawn-pane` when macOS fails forkpty() with ENXIO.
+#
+# Claude Code creates a teammate pane with `split-window -- cat` and at once
+# runs `respawn-pane -k` on it. tmux closes the pane's master pty and calls
+# forkpty() while the placeholder child still holds the slave; XNU's ptmx
+# allocator (bsd/kern/tty_ptmx.c) can then pick a minor number one past the
+# slot table and, if the child dies before ptmx_get_ioctl runs, refuse it with
+# "Device not configured". The pane is left dead, so re-running the same
+# respawn-pane after a short pause succeeds. Every other tmux command is
+# passed straight through. Remove once tmux itself retries (spawn.c patch).
+real=/usr/local/bin/tmux
+is_respawn=0
+for arg in "$@"; do
+  if [[ $arg == respawn-pane ]]; then is_respawn=1; break; fi
+done
+if (( ! is_respawn )); then
+  exec "$real" "$@"
+fi
+attempt=0
+while :; do
+  attempt=$((attempt + 1))
+  { err=$("$real" "$@" 2>&1 1>&3); rc=$?; } 3>&1
+  if (( rc == 0 )) || [[ $err != *"Device not configured"* ]] || (( attempt >= 10 )); then
+    [[ -n $err ]] && printf '%s\n' "$err" >&2
+    exit "$rc"
+  fi
+  sleep 0.2
+done
